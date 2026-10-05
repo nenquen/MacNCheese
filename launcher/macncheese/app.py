@@ -2013,11 +2013,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         sidebar_toolbar = Adw.ToolbarView()
         sidebar_header = Adw.HeaderBar(show_end_title_buttons=False, show_start_title_buttons=False)
         sidebar_header.set_title_widget(Gtk.Label(label=""))
-        sidebar_toggle = Gtk.Button(icon_name="sidebar-show-symbolic")
-        sidebar_toggle.add_css_class("flat")
-        sidebar_toggle.set_tooltip_text(_("Toggle sidebar"))
-        sidebar_toggle.connect("clicked", lambda *_args: self.toggle_sidebar())
-        sidebar_header.pack_start(sidebar_toggle)
         sidebar_toolbar.add_top_bar(sidebar_header)
 
         sidebar_toolbar.set_content(_page_sidebar(self.stack))
@@ -2027,6 +2022,19 @@ class LauncherWindow(Adw.ApplicationWindow):
         content_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         header.set_title_widget(Gtk.Label(label=""))
+        sidebar_toggle = Gtk.Button(icon_name="sidebar-show-symbolic")
+        sidebar_toggle.add_css_class("flat")
+        sidebar_toggle.set_tooltip_text(_("Toggle sidebar"))
+        sidebar_toggle.connect("clicked", lambda *_args: self.toggle_sidebar())
+        header.pack_start(sidebar_toggle)
+        # The toggle only exists for narrow windows: wide mode always
+        # shows the sidebar, so there is nothing to toggle.
+        def _sync_toggle(*_args):
+            sidebar_toggle.set_visible(
+                self.split.get_collapsed() or not self.split.get_show_sidebar())
+        self.split.connect("notify::collapsed", _sync_toggle)
+        self.split.connect("notify::show-sidebar", _sync_toggle)
+        _sync_toggle()
 
         content_view.add_top_bar(header)
         self.toasts.set_child(self.stack)
@@ -2074,6 +2082,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.play_page.refresh()
         if launch:
             self.play_clicked()
+
+    def toggle_sidebar(self):
+        show = not self.split.get_show_sidebar()
+        self.split.set_show_sidebar(show)
+        self.set_setting("show_sidebar", show)
 
     def toggle_sidebar(self):
         show = not self.split.get_show_sidebar()
