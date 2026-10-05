@@ -531,6 +531,8 @@ fn main() -> Result<()> {
     }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+    // Own window title instead of the shell's.
+    print!("\x1b]0;Mac'n Cheese\x07");
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;

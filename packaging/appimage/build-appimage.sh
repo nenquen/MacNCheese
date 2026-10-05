@@ -65,7 +65,10 @@ case " $* " in
       for term in konsole gnome-terminal xfce4-terminal alacritty kitty foot xterm; do
         if command -v "$term" >/dev/null 2>&1; then
           case "$term" in
-            gnome-terminal|xfce4-terminal) exec "$term" -- "$HERE/usr/bin/macncheese" "$@" ;;
+            # Chromeless window: no tab bar, no menus — feels like its own app.
+            konsole) exec "$term" --hide-menubar --hide-tabbar --separate -e "$HERE/usr/bin/macncheese" "$@" ;;
+            gnome-terminal) exec "$term" --hide-menubar -- "$HERE/usr/bin/macncheese" "$@" ;;
+            xfce4-terminal) exec "$term" --hide-menubar --hide-toolbar -e "$HERE/usr/bin/macncheese" "$@" ;;
             *) exec "$term" -e "$HERE/usr/bin/macncheese" "$@" ;;
           esac
         fi
