@@ -43,7 +43,7 @@ reference renderer is included.
 
 `source_pins.json` records content hashes of the exact tested source snapshots.
 The local cache has no Git metadata, so these are content pins, not claimed Git
-revisions. `source_pins.py` documents and verifies the hash algorithm. The build
+revisions. `source-pins` documents and verifies the hash algorithm. The build
 also needs Darling's SDK and installed runtime; these are external prerequisites,
 not bundled artifacts. Retain upstream notices if distributing those components.
 
@@ -72,7 +72,7 @@ bash experimental/metal/build.sh
 
 # Build the licensed translator separately, including JSON reflection support.
 translator_source="${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/metal2vulkan"
-python3 experimental/metal/source_pins.py \
+cargo run -q --manifest-path experimental/metal-tools/Cargo.toml --bin source-pins \
   --darling "${DARLING_SOURCE:-${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/darling}" \
   --vulkan "${VULKAN_HEADERS:-${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/Vulkan-Headers-1.3.290/include}" \
   --translator "$translator_source"
@@ -80,11 +80,11 @@ cargo build --release --features serde --manifest-path "$translator_source/Cargo
   --target-dir "$PWD/work/metal2vulkan-target"
 
 pack="${XDG_DATA_HOME:-$HOME/.local/share}/MacNCheese/RobloxPlayer.app/Contents/Resources/shaders/shaders_metal_osx.pack"
-python3 experimental/metal/shader_cache.py "$pack" \
+cargo run -q --manifest-path experimental/metal-tools/Cargo.toml --bin shader-cache "$pack" \
   --out work/metal-backend-repro/shader-cache \
   --translator "$PWD/work/metal2vulkan-target/release/metal2vulkan" --index 30 --index 4
 
-python3 experimental/metal/run_probe.py \
+cargo run -q --manifest-path experimental/metal-tools/Cargo.toml --bin run-probe \
   --vertex work/metal-backend-repro/shader-cache/1ddf500da2fdfc95ce7f2220f7c6dd5c77c6a244940d1ea1b5d0eaa836754c15.metallib \
   --fragment work/metal-backend-repro/shader-cache/998c41f6760a5bfdf138976a8da93956f086bbc2375325277c3619b5c4378ec6.metallib
 ```
@@ -99,7 +99,7 @@ full coverage of the pack has not been established.
 
 `build.sh` creates a private Indium copy and refuses to overwrite an existing
 copy. Choose a new `MACNCHEESE_METAL_WORK` directory for a fresh rebuild and pass
-that directory to `run_probe.py --work`. `run_probe.py --device` runs the smaller
+that directory to `run-probe --work`. `run-probe --device` runs the smaller
 device/memory/queue probe. The runner creates its own disposable Darling prefix
 and refuses an existing unmarked prefix. `--baseline` can copy an existing stock
 **disposable** prefix. It logs to the work directory and shuts down only its own

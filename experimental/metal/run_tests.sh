@@ -7,7 +7,7 @@ darling_source=${DARLING_SOURCE:-$cache/darling}
 compiler=${HOST_CXX:-c++}
 temporary=$(mktemp -d /tmp/macncheese-metal-tests-XXXXXX)
 trap 'rm -rf -- "$temporary"' EXIT
-python3 "$base/test_shader_cache.py"
+cargo test --quiet --manifest-path "$base/../metal-tools/Cargo.toml"
 "$compiler" -std=c++17 -Wall -Wextra -Werror \
   -I "$darling_source/src/external/metal/deps/indium/include" \
   "$base/test_adapter.cpp" "$base/iridium_adapter.cpp" -o "$temporary/adapter-test"

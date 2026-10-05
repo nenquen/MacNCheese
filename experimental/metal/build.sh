@@ -9,7 +9,7 @@ vulkan_headers=${VULKAN_HEADERS:-$cache/Vulkan-Headers-1.3.290/include}
 sysroot=${DARLING_SYSROOT:-/usr/libexec/darling}
 work=${MACNCHEESE_METAL_WORK:-$project/work/metal-backend-repro}
 compiler=${CXX:-clang++}
-python3 "$base/source_pins.py" --darling "$darling_source" --vulkan "$vulkan_headers"
+cargo run --quiet --manifest-path "$base/../metal-tools/Cargo.toml" --bin source-pins -- --darling "$darling_source" --vulkan "$vulkan_headers"
 metal_source="$darling_source/src/external/metal"
 sdk="$darling_source/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 mkdir -p "$work/out"

@@ -1,0 +1,1 @@
+/home/nenquen/workplace/MacNCheese/experimental/metal-tools/target/debug/libmetal_tools.rlib: /home/nenquen/workplace/MacNCheese/experimental/metal-tools/src/lib.rs /home/nenquen/workplace/MacNCheese/experimental/metal-tools/src/pins.rs /home/nenquen/workplace/MacNCheese/experimental/metal-tools/src/shader.rs

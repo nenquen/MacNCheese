@@ -1,0 +1,25 @@
+[package]
+name = "metal-tools"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "shader-cache"
+path = "src/bin/shader-cache.rs"
+
+[[bin]]
+name = "run-probe"
+path = "src/bin/run-probe.rs"
+
+[[bin]]
+name = "source-pins"
+path = "src/bin/source-pins.rs"
+
+[lib]
+name = "metal_tools"
+path = "src/lib.rs"
+
+[dependencies]
+serde_json = "1"
+sha2 = "0.10"
+anyhow = "1"
