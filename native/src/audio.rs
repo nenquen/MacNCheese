@@ -141,7 +141,7 @@ pub struct Audio {
     request: PathBuf,
     _keep: std::fs::File,
     _input_keep: Option<std::fs::File>,
-    player: Child,
+    player: Option<Child>,
     recorder: Option<Child>,
     restarted_at: std::time::Instant,
 }
@@ -174,7 +174,7 @@ impl Audio {
             request,
             _keep: keep,
             _input_keep: input_keep,
-            player,
+            player: Some(player),
             recorder: None,
             restarted_at: std::time::Instant::now(),
         })
@@ -210,7 +210,7 @@ impl Audio {
     /// Restart dead players; poll the voice-chat request. Called each second.
     pub fn keep_playing(&mut self) {
         self.keep_recording();
-        let dead = self.player.try_wait().ok().flatten().is_some();
+        let dead = self.player.as_mut().and_then(|p| p.try_wait().ok().flatten()).is_some();
         if !dead || self.restarted_at.elapsed() < std::time::Duration::from_secs(5) {
             return;
         }
@@ -220,20 +220,37 @@ impl Audio {
             None => return,
         };
         if let Ok(child) = spawn(&cmd) {
-            self.player = child;
+            self.player = Some(child);
         }
     }
 
     pub fn stop(mut self) {
-        let _ = self.recorder.take().map(|mut c| {
-            let _ = c.kill();
-        });
+        if let Some(mut rec) = self.recorder.take() {
+            let _ = rec.kill();
+            match rec.try_wait() {
+                Ok(Some(_)) => {}
+                _ => {
+                    std::thread::spawn(move || {
+                        let _ = rec.wait();
+                    });
+                }
+            }
+        }
         let _ = std::fs::remove_file(&self.input_fifo);
         let _ = std::fs::remove_file(&self.request);
         drop(self._keep);
         drop(self._input_keep);
-        let _ = self.player.kill();
-        let _ = self.player.wait();
+        if let Some(mut player) = self.player.take() {
+            let _ = player.kill();
+            match player.try_wait() {
+                Ok(Some(_)) => {}
+                _ => {
+                    std::thread::spawn(move || {
+                        let _ = player.wait();
+                    });
+                }
+            }
+        }
         let _ = std::fs::remove_file(&self.fifo);
     }
 }

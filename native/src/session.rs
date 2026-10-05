@@ -464,10 +464,20 @@ impl Session {
         status
     }
 
+    /// Never blocks: kill, reap what exits at once, reaper thread takes
+    /// the rest. Called from the UI tick; a blocking wait here froze the
+    /// whole window ("not responding") after Roblox quit.
     pub fn finish(&mut self) {
         if let Some(mut child) = self.process.take() {
             let _ = child.kill();
-            let _ = child.wait();
+            match child.try_wait() {
+                Ok(Some(_)) => {}
+                _ => {
+                    std::thread::spawn(move || {
+                        let _ = child.wait();
+                    });
+                }
+            }
         }
         if let Some(audio) = self.audio.take() {
             audio.stop();

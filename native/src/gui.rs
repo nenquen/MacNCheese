@@ -182,6 +182,7 @@ impl ApplicationHandler for Gui {
             Builder::from_font(font)
                 .with_bg_color(ratatui::style::Color::Black)
                 .with_fg_color(ratatui::style::Color::White)
+                .with_font_size_px(15)
                 .with_width_and_height(Dimensions { width: nz(WIN_W), height: nz(WIN_H) })
                 .build_with_target(window.clone()),
         )
