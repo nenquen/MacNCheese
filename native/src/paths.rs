@@ -80,10 +80,6 @@ pub fn data_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", &[".local", "share"]).join("macncheese")
 }
 
-pub fn config_dir() -> PathBuf {
-    xdg("XDG_CONFIG_HOME", &[".config"]).join("macncheese")
-}
-
 pub fn cache_dir() -> PathBuf {
     xdg("XDG_CACHE_HOME", &[".cache"]).join("macncheese")
 }

@@ -242,7 +242,7 @@ pub fn apply(settings: &Map<String, Value>) {
             if stem.ends_with("_Delete") {
                 let target = content.join(rel.parent().unwrap_or(Path::new(""))).join(format!("{}{suffix}", &stem[..stem.len() - 7]));
                 if target.exists() {
-                    backup_if_needed(&target, &target.strip_prefix(&content).unwrap_or(&target).to_string_lossy().into_owned());
+                    backup_if_needed(&target, &target.strip_prefix(&content).unwrap_or(&target).to_string_lossy());
                     let _ = std::fs::remove_file(&target);
                 }
                 continue;

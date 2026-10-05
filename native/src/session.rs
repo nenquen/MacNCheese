@@ -302,7 +302,7 @@ pub struct Session {
     pub log_path: Option<PathBuf>,
     process: Option<Child>,
     audio: Option<Audio>,
-    started_at: Instant,
+    seen_roblox: bool,
 }
 
 impl Session {
@@ -348,6 +348,9 @@ impl Session {
         }
         let warmup_took = t1.elapsed().as_secs_f32();
 
+        // A sentinel left over from a quit that outlived the launcher must
+        // not end this session before it starts.
+        let _ = std::fs::remove_file(paths::quit_sentinel());
         let logs = paths::logs_dir();
         let _ = std::fs::create_dir_all(&logs);
         let _ = std::fs::create_dir_all(paths::cache_dir().join("mesa-shader-cache"));
@@ -417,8 +420,17 @@ impl Session {
             log_path: Some(log_path),
             process: Some(child),
             audio,
-            started_at: Instant::now(),
+            seen_roblox: false,
         })
+    }
+
+    /// True once the game process itself has been observed.
+    fn game_seen() -> bool {
+        Command::new("pgrep")
+            .args(["-f", "RobloxPlayer"])
+            .output()
+            .map(|o| !o.stdout.is_empty())
+            .unwrap_or(false)
     }
 
     /// None while running, else the exit status.
@@ -430,7 +442,15 @@ impl Session {
                     if let Some(audio) = self.audio.as_mut() {
                         audio.keep_playing();
                     }
-                    let _ = self.started_at;
+                    // The shim touches the sentinel when Roblox starts
+                    // terminating; teardown takes seconds, the session can
+                    // end for the user as soon as quitting began.
+                    if !self.seen_roblox {
+                        self.seen_roblox = Self::game_seen();
+                    } else if crate::paths::quit_sentinel().exists() {
+                        self.finish();
+                        return Some(0);
+                    }
                     return None;
                 }
                 Err(_) => Some(-1),

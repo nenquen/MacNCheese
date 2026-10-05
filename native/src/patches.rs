@@ -98,7 +98,7 @@ fn atomic_replace(path: &Path, expected: &[u8], replacement: &[u8]) -> std::io::
     }
     if std::fs::read(path).map(|d| d != expected).unwrap_or(true) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, "changed during patch"));
+        return Err(std::io::Error::other("changed during patch"));
     }
     std::fs::rename(&tmp, path)
 }
@@ -169,7 +169,7 @@ fn validate_layout(data: &[u8], sources: &[ShaderSource]) -> bool {
         let kind = data.get(entry + 28).copied().unwrap_or(0);
         let variant = data.get(entry + 29).copied().unwrap_or(255) as usize;
         let name_index = u16::from_le_bytes([*data.get(entry + 30).unwrap_or(&0), *data.get(entry + 31).unwrap_or(&0)]) as usize;
-        if ![b'v', b'p', b'c'].contains(&kind)
+        if !b"vpc".contains(&kind)
             || variant >= variants
             || name_index >= names
             || size == 0
