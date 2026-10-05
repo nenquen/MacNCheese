@@ -175,6 +175,8 @@ RU = {
     "Game": "Игра",
     "Roblox UI scale": "Масштаб интерфейса Roblox",
     "100–400%. Applies on next launch.": "100–400%. Применяется при следующем запуске.",
+    "100–400% in 5% steps. Applies on next launch.": "100–400% с шагом 5%. Применяется при следующем запуске.",
+    "100–400% in 5% steps. System reports {percent}%. Applies on next launch.": "100–400% с шагом 5%. Система сообщает {percent}%. Применяется при следующем запуске.",
     "Camera sensitivity": "Чувствительность камеры",
     "Mouse movement multiplier while rotating the camera":
         "Множитель движения мыши при вращении камеры",

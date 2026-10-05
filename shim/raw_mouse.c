@@ -124,9 +124,14 @@ int macncheese_raw_mouse_select(void *display, int enabled) {
 
 /* When `event` is an XI2 raw motion: consumes it (the cookie data is fetched
  * and freed here), stores the device deltas (x right, y down) and returns 1.
- * Other events return 0 untouched. */
-int macncheese_raw_mouse_event(void *display, void *event, double *dx, double *dy) {
+ * Other events return 0 untouched. `used_raw` (nullable) reports whether the
+ * deltas came from the device (`raw_values`): when the server only sends
+ * accelerated `values`, the caller must know it is not looking at raw
+ * motion, or pointer acceleration silently bends the camera. */
+int macncheese_raw_mouse_event(void *display, void *event, double *dx, double *dy, int *used_raw) {
     struct generic_cookie *cookie = event;
+    if (used_raw)
+        *used_raw = 0;
     if (!event || cookie->type != GENERIC_EVENT || xi_opcode < 0 || cookie->extension != xi_opcode)
         return 0;
     *dx = *dy = 0;
@@ -138,12 +143,15 @@ int macncheese_raw_mouse_event(void *display, void *event, double *dx, double *d
     if (raw && raw->valuators.mask && raw->valuators.mask_len >= 1) {
         /* Values are packed in the order of the set mask bits; valuator 0
          * is x, 1 is y. raw_values are the device's, values accelerated. */
-        double *values = raw->raw_values ? raw->raw_values : raw->valuators.values;
+        int is_raw = raw->raw_values != 0;
+        double *values = is_raw ? raw->raw_values : raw->valuators.values;
         unsigned char bits = raw->valuators.mask[0];
         int at = 0;
         if (values) {
             if (bits & 1) *dx = values[at++];
             if (bits & 2) *dy = values[at];
+            if (used_raw)
+                *used_raw = is_raw;
         }
     }
     x_free_event_data(display, cookie);

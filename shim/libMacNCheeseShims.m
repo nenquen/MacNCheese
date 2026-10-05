@@ -1852,11 +1852,19 @@ static void macncheese_deliver_pending_uri(id app) {
     id value = macncheese_pending_uri();
     if (!value)
         return;
-    id delegate = macncheese_captured_delegate;
-    if (!delegate && app)
+    /* Always resolve the delegate from the live application: the captured
+     * global goes stale within seconds of launch (menu web content swaps
+     * delegates), and messaging the freed object is a main-queue SIGSEGV
+     * inside objc_msgSend. A cached pointer that no longer matches the
+     * app's delegate is never touched. */
+    id delegate = 0;
+    if (app)
         delegate = ((id (*)(id, SEL))objc_msgSend)(app, sel_registerName("delegate"));
     if (!delegate) {
-        write_str("[MacNCheese URL] Delegate not available yet\n");
+        if (macncheese_captured_delegate)
+            write_str("[MacNCheese URL] Live delegate gone; stale capture not messaged\n");
+        else
+            write_str("[MacNCheese URL] Delegate not available yet\n");
         return;
     }
     macncheese_captured_delegate = delegate;
@@ -3081,7 +3089,7 @@ typedef struct objc_ivar* Ivar; // also declared with the cursor code below
 extern Ivar class_getInstanceVariable(Class, const char*);
 extern long ivar_getOffset(Ivar);
 extern int macncheese_raw_mouse_select(void* display, int enabled);
-extern int macncheese_raw_mouse_event(void* display, void* event, double* dx, double* dy);
+extern int macncheese_raw_mouse_event(void* display, void* event, double* dx, double* dy, int* used_raw);
 static id macncheese_event_queue(id display);
 static void macncheese_lock_event_queue(void);
 static void macncheese_unlock_event_queue(void);
@@ -3098,6 +3106,7 @@ static int macncheese_raw_start_x, macncheese_raw_start_y;   // where the pointe
 static int macncheese_raw_last_x, macncheese_raw_last_y;     // the last position seen
 static long macncheese_raw_events, macncheese_raw_posted;
 static int macncheese_raw_motions_without_raw; // pointer motion seen while no raw event came
+static int macncheese_raw_accelerated_streak; // raw cookies carrying only accelerated values
 static unsigned long macncheese_x_modifier_flags;
 static unsigned char macncheese_x_modifier_masks[256], macncheese_x_modifier_keys_down[256];
 static void* macncheese_x_modifier_display;
@@ -3318,6 +3327,7 @@ static int macncheese_raw_mouse_x_event(id self, void* event) {
         macncheese_raw_have_anchor = 0;
         macncheese_raw_events = macncheese_raw_posted = 0;
         macncheese_raw_motions_without_raw = 0;
+        macncheese_raw_accelerated_streak = 0;
         static int reported;
         if (wanted && !reported) {
             reported = 1;
@@ -3327,10 +3337,24 @@ static int macncheese_raw_mouse_x_event(id self, void* event) {
     }
     int type = *(int*)event;
     double dx, dy;
-    if (macncheese_raw_mouse_event(display, event, &dx, &dy)) {
+    int used_raw = 0;
+    if (macncheese_raw_mouse_event(display, event, &dx, &dy, &used_raw)) {
         if (macncheese_raw_mouse_active && macncheese_pointer_grabbed && (dx != 0 || dy != 0)) {
             macncheese_raw_events++;
             macncheese_raw_motions_without_raw = 0;
+            if (used_raw) {
+                macncheese_raw_accelerated_streak = 0;
+            } else if (++macncheese_raw_accelerated_streak == 50) {
+                /* The server sends raw-motion cookies without device
+                 * values: every delta here is pointer-accelerated, which
+                 * bends fast flicks into spins. Stop pretending this is
+                 * raw motion and fall back to pointer deltas openly. */
+                write_str("[MacNCheese Input] raw motion has no device values, mouse lock uses pointer deltas\n");
+                macncheese_flush_raw_motion(self);
+                macncheese_raw_mouse_active = 0;
+                macncheese_raw_mouse_select(display, 0);
+                return 0;
+            }
             macncheese_accumulate_raw_motion(self, dx, dy);
             static volatile int trace = -1;
             if (macncheese_env_cached("MACNCHEESE_TRACE_LOCK", &trace) && macncheese_raw_events <= 200) {
