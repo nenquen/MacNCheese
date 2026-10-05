@@ -578,12 +578,7 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let pal = crate::theme::resolve(mode);
     let tabs = Tabs::new(titles)
         .divider(Span::raw(" | "))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .padding(Padding::horizontal(1))
-                .title(" Mac'n Cheese "),
-        )
+        .block(title_block(&pal, "Mac'n Cheese"))
         .select(app.tab)
         .style(Style::default().fg(pal.fg))
         .highlight_style(Style::default().fg(pal.accent).add_modifier(Modifier::BOLD));
@@ -624,7 +619,7 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         Line::from(Span::styled(app.status.clone(), Style::default().fg(pal.accent))),
         Line::from(Span::styled(hint, Style::default().fg(pal.dim))),
     ])
-    .block(Block::default().borders(Borders::ALL));
+    .block(title_block(&pal, ""));
     f.render_widget(status, chunks[2]);
 }
 
