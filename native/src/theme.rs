@@ -4,7 +4,6 @@
 //! Slots: background, text, muted, accent, ok, warn, err, border.
 
 use ratatui::style::Color;
-use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Palette {
@@ -35,17 +34,6 @@ pub static DARK: Palette = Palette {
     border: Color::DarkGray,
 };
 
-pub static LIGHT: Palette = Palette {
-    bg: Color::White,
-    fg: Color::Black,
-    accent: Color::Blue,
-    dim: Color::Gray,
-    ok: Color::Green,
-    warn: Color::Yellow,
-    err: Color::Red,
-    border: Color::Gray,
-};
-
 pub static CATPPUCCIN: Palette = Palette {
     bg: Color::Rgb(30, 30, 46),
     fg: Color::Rgb(205, 214, 244),
@@ -57,17 +45,6 @@ pub static CATPPUCCIN: Palette = Palette {
     border: Color::Rgb(88, 91, 112),
 };
 
-pub static CATPPUCCIN_LATTE: Palette = Palette {
-    bg: Color::Rgb(239, 241, 245),
-    fg: Color::Rgb(76, 79, 105),
-    accent: Color::Rgb(136, 57, 239),
-    dim: Color::Rgb(156, 160, 176),
-    ok: Color::Rgb(64, 160, 43),
-    warn: Color::Rgb(223, 142, 29),
-    err: Color::Rgb(210, 15, 57),
-    border: Color::Rgb(204, 208, 218),
-};
-
 pub static ROSE_PINE: Palette = Palette {
     bg: Color::Rgb(25, 23, 36),
     fg: Color::Rgb(224, 222, 244),
@@ -77,17 +54,6 @@ pub static ROSE_PINE: Palette = Palette {
     warn: Color::Rgb(246, 193, 119),
     err: Color::Rgb(235, 111, 146),
     border: Color::Rgb(64, 61, 82),
-};
-
-pub static ROSE_PINE_DAWN: Palette = Palette {
-    bg: Color::Rgb(250, 244, 237),
-    fg: Color::Rgb(87, 82, 121),
-    accent: Color::Rgb(144, 122, 169),
-    dim: Color::Rgb(152, 147, 165),
-    ok: Color::Rgb(86, 148, 159),
-    warn: Color::Rgb(234, 157, 52),
-    err: Color::Rgb(180, 99, 122),
-    border: Color::Rgb(220, 211, 197),
 };
 
 pub static TOKYONIGHT: Palette = Palette {
@@ -126,11 +92,8 @@ pub static GRUVBOX: Palette = Palette {
 pub fn builtin(name: &str) -> Option<&'static Palette> {
     Some(match name {
         "dark" => &DARK,
-        "light" => &LIGHT,
         "catppuccin" | "catppuccin-mocha" => &CATPPUCCIN,
-        "catppuccin-latte" => &CATPPUCCIN_LATTE,
         "rose-pine" | "rosepine" | "rose" => &ROSE_PINE,
-        "rose-pine-dawn" => &ROSE_PINE_DAWN,
         "tokyonight" | "tokyo-night" => &TOKYONIGHT,
         "nord" => &NORD,
         "gruvbox" => &GRUVBOX,
@@ -142,11 +105,8 @@ pub fn names() -> Vec<(&'static str, &'static str)> {
     vec![
         ("system", "System"),
         ("dark", "Dark"),
-        ("light", "Light"),
         ("catppuccin", "Catppuccin"),
-        ("catppuccin-latte", "Catppuccin Latte"),
         ("rose-pine", "Rosé Pine"),
-        ("rose-pine-dawn", "Rosé Pine Dawn"),
         ("tokyonight", "TokyoNight"),
         ("nord", "Nord"),
         ("gruvbox", "Gruvbox"),
@@ -189,50 +149,15 @@ pub fn custom(name: &str) -> Option<Palette> {
     })
 }
 
-/// True when the desktop is in dark mode (portal first, desktops second).
-pub fn system_dark() -> bool {
-    if let Ok(out) = std::process::Command::new("gsettings")
-        .args(["get", "org.freedesktop.appearance", "color-scheme"])
-        .output()
-    {
-        let text = String::from_utf8_lossy(&out.stdout);
-        if text.contains('1') {
-            return true;
-        }
-        if text.contains('2') {
-            return false;
-        }
-    }
-    if let Ok(out) = std::process::Command::new("gsettings")
-        .args(["get", "org.gnome.desktop.interface", "color-scheme"])
-        .output()
-    {
-        let text = String::from_utf8_lossy(&out.stdout);
-        if text.contains("prefer-dark") {
-            return true;
-        }
-    }
-    if let Ok(text) = std::fs::read_to_string(dirs::home_dir().unwrap_or_default().join(".config/kdeglobals")) {
-        for line in text.lines() {
-            let line = line.trim().to_lowercase();
-            if line.starts_with("colorscheme") {
-                return line.contains("dark");
-            }
-        }
-    }
-    true
-}
-
 pub fn resolve(mode: &str) -> Palette {
-    if mode == "system" {
-        return if system_dark() { DARK.clone() } else { LIGHT.clone() };
+    if mode == "system" || mode.is_empty() {
+        // Dark only, by design: even a light desktop gets a dark theme.
+        return DARK.clone();
     }
     if let Some(custom) = custom(mode) {
         return custom;
     }
-    builtin(mode).cloned().unwrap_or_else(|| {
-        if system_dark() { DARK.clone() } else { LIGHT.clone() }
-    })
+    builtin(mode).cloned().unwrap_or_else(|| DARK.clone())
 }
 
 #[cfg(test)]
@@ -241,15 +166,16 @@ mod tests {
 
     #[test]
     fn known_themes() {
-        for name in ["dark", "light", "catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
+        for name in ["dark", "catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
             assert!(builtin(name).is_some(), "{name}");
         }
+        assert!(builtin("light").is_none(), "no light themes");
     }
 
     #[test]
     fn unknown_falls_back() {
         let pal = resolve("nope");
-        assert!(matches!(pal.bg, Color::Black | Color::White));
+        assert!(matches!(pal.bg, Color::Black));
     }
 
     #[test]

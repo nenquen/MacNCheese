@@ -550,6 +550,15 @@ fn apply_detected_scale() {
 
 // ---------------------------------------------------------------- ui
 
+/// Fill the area with the theme background first: terminals show their
+/// own color otherwise, and the theme would only tint the text.
+fn paint_bg(f: &mut ratatui::Frame, pal: &crate::theme::Palette, area: Rect) {
+    f.render_widget(
+        Block::default().style(ratatui::style::Style::default().bg(pal.bg)),
+        area,
+    );
+}
+
 fn title_block(pal: &crate::theme::Palette, title: &str) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
@@ -593,6 +602,9 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         }
     }
 
+    paint_bg(f, &pal, chunks[0]);
+    paint_bg(f, &pal, chunks[1]);
+    paint_bg(f, &pal, chunks[2]);
     match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
         Tab::Play => render_play(f, app, &pal, chunks[1]),
         Tab::Settings => render_settings(f, app, &pal, chunks[1]),
