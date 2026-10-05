@@ -8,7 +8,6 @@ use ratatui::style::Color;
 #[derive(Clone)]
 pub struct Palette {
     pub bg: Color,
-    pub raised: Color,
     pub fg: Color,
     pub accent: Color,
     pub dim: Color,
@@ -26,74 +25,68 @@ fn rgb(hex: &str) -> Color {
 
 pub static DARK: Palette = Palette {
     bg: Color::Black,
-    raised: Color::Rgb(26, 26, 26),
     fg: Color::White,
     accent: Color::Yellow,
     dim: Color::DarkGray,
     ok: Color::Green,
     warn: Color::Yellow,
     err: Color::Red,
-    border: Color::DarkGray,
+    border: Color::Gray,
 };
 
 pub static CATPPUCCIN: Palette = Palette {
     bg: Color::Rgb(24, 24, 37),
-    raised: Color::Rgb(49, 50, 68),
     fg: Color::Rgb(205, 214, 244),
     accent: Color::Rgb(203, 166, 247),
     dim: Color::Rgb(108, 112, 134),
     ok: Color::Rgb(166, 227, 161),
     warn: Color::Rgb(249, 226, 175),
     err: Color::Rgb(243, 139, 168),
-    border: Color::Rgb(88, 91, 112),
+    border: Color::Rgb(108, 112, 134),
 };
 
 pub static ROSE_PINE: Palette = Palette {
     bg: Color::Rgb(25, 23, 36),
-    raised: Color::Rgb(31, 29, 46),
     fg: Color::Rgb(224, 222, 244),
     accent: Color::Rgb(196, 167, 231),
     dim: Color::Rgb(110, 106, 134),
     ok: Color::Rgb(156, 207, 216),
     warn: Color::Rgb(246, 193, 119),
     err: Color::Rgb(235, 111, 146),
-    border: Color::Rgb(64, 61, 82),
+    border: Color::Rgb(82, 79, 103),
 };
 
 pub static TOKYONIGHT: Palette = Palette {
     bg: Color::Rgb(26, 27, 38),
-    raised: Color::Rgb(36, 40, 59),
     fg: Color::Rgb(192, 202, 245),
     accent: Color::Rgb(122, 162, 247),
     dim: Color::Rgb(86, 95, 137),
     ok: Color::Rgb(158, 206, 106),
     warn: Color::Rgb(224, 175, 104),
     err: Color::Rgb(247, 118, 142),
-    border: Color::Rgb(59, 66, 97),
+    border: Color::Rgb(86, 95, 137),
 };
 
 pub static NORD: Palette = Palette {
     bg: Color::Rgb(46, 52, 64),
-    raised: Color::Rgb(59, 66, 82),
     fg: Color::Rgb(216, 222, 233),
     accent: Color::Rgb(136, 192, 208),
     dim: Color::Rgb(76, 86, 106),
     ok: Color::Rgb(163, 190, 140),
     warn: Color::Rgb(235, 203, 139),
     err: Color::Rgb(191, 97, 106),
-    border: Color::Rgb(67, 76, 94),
+    border: Color::Rgb(76, 86, 106),
 };
 
 pub static GRUVBOX: Palette = Palette {
     bg: Color::Rgb(40, 40, 40),
-    raised: Color::Rgb(60, 56, 54),
     fg: Color::Rgb(235, 219, 178),
     accent: Color::Rgb(250, 189, 47),
     dim: Color::Rgb(146, 131, 116),
     ok: Color::Rgb(184, 187, 38),
     warn: Color::Rgb(254, 128, 25),
     err: Color::Rgb(251, 73, 52),
-    border: Color::Rgb(80, 73, 69),
+    border: Color::Rgb(102, 92, 84),
 };
 
 pub fn builtin(name: &str) -> Option<&'static Palette> {
@@ -145,7 +138,6 @@ pub fn custom(name: &str) -> Option<Palette> {
     };
     Some(Palette {
         bg: pick("bg", base.bg),
-        raised: pick("raised", base.raised),
         fg: pick("fg", base.fg),
         accent: pick("accent", base.accent),
         dim: pick("dim", base.dim),

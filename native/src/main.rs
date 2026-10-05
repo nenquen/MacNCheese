@@ -563,14 +563,14 @@ fn title_block(pal: &crate::theme::Palette, title: &str) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
         .border_style(ratatui::style::Style::default().fg(pal.border))
-        .style(ratatui::style::Style::default().bg(pal.raised))
+        .style(ratatui::style::Style::default().bg(pal.bg))
         .title(title.to_string())
 }
 
 pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(2)])
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
         .split(f.area());
 
     let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
@@ -599,7 +599,6 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
 
     paint_bg(f, &pal, chunks[0]);
     paint_bg(f, &pal, chunks[1]);
-    paint_bg(f, &pal, chunks[2]);
     match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
         Tab::Play => render_play(f, app, &pal, chunks[1]),
         Tab::Settings => render_settings(f, app, &pal, chunks[1]),
@@ -607,20 +606,6 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         Tab::Logs => render_logs(f, app, &pal, chunks[1]),
         Tab::Setup => render_setup(f, app, &pal, chunks[1]),
     }
-
-    let hint = match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
-        Tab::Play => "Enter: play/stop · click too · q quit",
-        Tab::Settings => "↑↓/click row · ←→/Enter change · q quit",
-        Tab::Flags => "e: edit in $EDITOR · q quit",
-        Tab::Logs => "↑↓/click pick · r refresh · q quit",
-        Tab::Setup => "Enter: run setup · q quit",
-    };
-    let status = Paragraph::new(vec![
-        Line::from(Span::styled(app.status.clone(), Style::default().fg(pal.accent))),
-        Line::from(Span::styled(hint, Style::default().fg(pal.dim))),
-    ])
-    .block(title_block(&pal, ""));
-    f.render_widget(status, chunks[2]);
 }
 
 fn clickable_button(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect, label: &str, action: Action) {
@@ -645,8 +630,11 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
             },
             Style::default().fg(if running { pal.ok } else { pal.fg }),
         )),
-        Line::from(""),
     ];
+    if !app.status.is_empty() {
+        lines.push(Line::from(Span::styled(app.status.clone(), Style::default().fg(pal.accent))));
+    }
+    lines.push(Line::from(""));
     for line in app.log_tail.iter() {
         lines.push(Line::from(Span::styled(line.clone(), Style::default().fg(pal.dim))));
     }
