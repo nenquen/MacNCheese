@@ -182,7 +182,7 @@ impl ApplicationHandler for Gui {
             Builder::from_font(font)
                 .with_bg_color(ratatui::style::Color::Black)
                 .with_fg_color(ratatui::style::Color::White)
-                .with_font_size_px(15)
+                .with_font_size_px(17)
                 .with_width_and_height(Dimensions { width: nz(WIN_W), height: nz(WIN_H) })
                 .build_with_target(window.clone()),
         )
@@ -227,6 +227,13 @@ impl ApplicationHandler for Gui {
             }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
                 let (col, row) = self.click_cell();
+                if std::env::var("MACNCHEESE_CLICK_DEBUG").is_ok() {
+                    let (cols, rows, cw, ch) = self.grid();
+                    eprintln!(
+                        "[click] px=({:.0},{:.0}) grid={cols}x{rows} cell={cw:.1}x{ch:.1} -> ({col},{row}) targets={}",
+                        self.cursor.0, self.cursor.1, self.app.clicks.len()
+                    );
+                }
                 let action = self.app.on_click(col, row);
                 self.handle(action, el);
                 self.redraw();
