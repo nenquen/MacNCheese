@@ -3158,7 +3158,32 @@ static void macncheese_warp_on_display(void* display, int dx, int dy) {
 // One mouse event with the raw deltas, on the lock window. Darling's deltaY
 // is computed upward and hooked_mouse_event_delta_y flips it for the game,
 // so the raw y (downward, as macOS reports it) is stored flipped.
+static int macncheese_drag_bit; // X button bit (1..3) that owns the current drag, 0 when none
+static unsigned long macncheese_button_motion(int bit, unsigned int* button) {
+    if (bit == 1) { *button = 1; return 6; }
+    if (bit == 3) { *button = 3; return 7; }
+    if (bit == 2) { *button = 2; return 27; }
+    *button = 0;
+    return 5;
+}
 static unsigned long macncheese_motion_type(unsigned int buttons, unsigned int* button) {
+    if (macncheese_pointer_grabbed) {
+        /* A second button pressed mid-drag must not flip the drag type:
+         * right-hold + left-click flapped RightDragged<->LeftDragged and
+         * stuck the camera. The button that owns the drag keeps it until
+         * it is released. */
+        if (macncheese_drag_bit && (buttons & (1u << macncheese_drag_bit)))
+            return macncheese_button_motion(macncheese_drag_bit, button);
+        if (buttons & (1u << 1)) macncheese_drag_bit = 1;
+        else if (buttons & (1u << 3)) macncheese_drag_bit = 3;
+        else if (buttons & (1u << 2)) macncheese_drag_bit = 2;
+        else macncheese_drag_bit = 0;
+        if (macncheese_drag_bit)
+            return macncheese_button_motion(macncheese_drag_bit, button);
+        *button = 0;
+        return 5;
+    }
+    macncheese_drag_bit = 0;
     if (buttons & (1u << 1)) { *button = 1; return 6; }
     if (buttons & (1u << 3)) { *button = 3; return 7; }
     if (buttons & (1u << 2)) { *button = 2; return 27; }
@@ -3328,6 +3353,7 @@ static int macncheese_raw_mouse_x_event(id self, void* event) {
         macncheese_raw_events = macncheese_raw_posted = 0;
         macncheese_raw_motions_without_raw = 0;
         macncheese_raw_accelerated_streak = 0;
+        macncheese_drag_bit = 0;
         static int reported;
         if (wanted && !reported) {
             reported = 1;
