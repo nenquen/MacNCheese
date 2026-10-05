@@ -65,3 +65,18 @@ class AppIconTests(unittest.TestCase):
                 target = Path(directory) / "icons" / "hicolor" / "256x256" / "apps" / "macncheese.png"
                 self.assertTrue(target.is_file())
                 self.assertFalse(core.ensure_app_icon())
+
+
+class AppStructureTests(unittest.TestCase):
+    """Catch accidental deletion of helpers (regression: _page_sidebar)."""
+
+    def test_critical_helpers_exist(self):
+        import ast
+        from pathlib import Path
+        tree = ast.parse((Path(__file__).resolve().parent.parent
+                          / "launcher" / "macncheese" / "app.py").read_text())
+        defined = {node.name for node in tree.body
+                   if isinstance(node, (ast.FunctionDef, ast.ClassDef))}
+        for name in ("_page_sidebar", "_open_uri", "LauncherApp", "LauncherWindow",
+                     "PlayPage", "main"):
+            self.assertIn(name, defined, f"{name} missing from app.py")

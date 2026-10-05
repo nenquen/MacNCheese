@@ -1630,6 +1630,43 @@ ABOUT = ("Mac'n Cheese runs the real Roblox client for macOS on Linux through Da
          "It is not made by Roblox and is not affiliated with it.")
 
 
+def _page_sidebar(stack):
+    """The sidebar's page list. Adw.ViewSwitcherSidebar needs libadwaita 1.9;
+    older ones (Ubuntu 24.04 has 1.5, Debian 13 1.7) get a plain list of the
+    same pages."""
+    if hasattr(Adw, "ViewSwitcherSidebar"):
+        sidebar = Adw.ViewSwitcherSidebar()
+        sidebar.set_stack(stack)
+        return sidebar
+    names = []
+    rows = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE)
+    rows.add_css_class("navigation-sidebar")
+    pages = stack.get_pages()
+    for index in range(pages.get_n_items()):
+        page = pages.get_item(index)
+        line = Gtk.Box(spacing=12)
+        line.append(Gtk.Image(icon_name=page.get_icon_name()))
+        line.append(Gtk.Label(label=page.get_title(), xalign=0))
+        rows.append(line)
+        names.append(page.get_name())
+
+    def selected(_rows, row):
+        if row is not None and stack.get_visible_child_name() != names[row.get_index()]:
+            stack.set_visible_child_name(names[row.get_index()])
+
+    def follow(*_args):
+        name = stack.get_visible_child_name()
+        if name in names:
+            row = rows.get_row_at_index(names.index(name))
+            if rows.get_selected_row() is not row:
+                rows.select_row(row)
+
+    rows.connect("row-selected", selected)
+    stack.connect("notify::visible-child-name", follow)
+    follow()
+    return rows
+
+
 def _open_uri(window, uri):
     Gtk.UriLauncher.new(uri).launch(window, None, None, None)
 
