@@ -3,7 +3,6 @@
 //! No terminal emulator involved: winit window + ratatui-wgpu backend.
 //! Opens like a program, feels like the TUI.
 
-use anyhow::Result;
 use ratatui::backend::Backend;
 use ratatui_wgpu::{Builder, Dimensions, Font, WgpuBackend};
 use std::num::NonZeroU32;
@@ -178,11 +177,16 @@ impl ApplicationHandler for Gui {
             el.exit();
             return;
         };
+        let font_scale = crate::settings::load()
+            .get("tui_font_scale")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0)
+            .clamp(0.8, 2.0);
         let backend = futures_lite::future::block_on(
             Builder::from_font(font)
                 .with_bg_color(ratatui::style::Color::Black)
                 .with_fg_color(ratatui::style::Color::White)
-                .with_font_size_px(17)
+                .with_font_size_px((17.0 * font_scale) as u32)
                 .with_width_and_height(Dimensions { width: nz(WIN_W), height: nz(WIN_H) })
                 .build_with_target(window.clone()),
         )

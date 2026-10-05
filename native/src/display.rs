@@ -186,6 +186,38 @@ pub fn detect(ctx: &Ctx) -> f64 {
     xft(ctx).unwrap_or(1.0)
 }
 
+/// Port of display.window_environment: X11 default, opt-in Wayland.
+pub fn window_environment(
+    backend: &str,
+    helper: &std::path::Path,
+) -> Result<Vec<(String, String)>, String> {
+    if std::env::var("MACNCHEESE_WAYLAND").as_deref() == Ok("1") {
+        return wayland_env(helper);
+    }
+    match backend {
+        "x11" => Ok(vec![
+            ("MACNCHEESE_WAYLAND".into(), "0".into()),
+            ("EGL_PLATFORM".into(), "x11".into()),
+        ]),
+        "wayland" => wayland_env(helper),
+        other => Err(format!("Unknown window backend: {other}")),
+    }
+}
+
+fn wayland_env(helper: &std::path::Path) -> Result<Vec<(String, String)>, String> {
+    if std::env::var("WAYLAND_DISPLAY").unwrap_or_default().is_empty() {
+        return Err("Native Wayland needs a Wayland session. Select X11.".into());
+    }
+    if !helper.is_file() {
+        return Err("Wayland helper missing. Rebuild with SDL2/Wayland dev libraries, or select X11.".into());
+    }
+    Ok(vec![
+        ("MACNCHEESE_WAYLAND".into(), "1".into()),
+        ("EGL_PLATFORM".into(), "wayland".into()),
+        ("MACNCHEESE_WAYLAND_HELPER".into(), helper.display().to_string()),
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,5 +271,19 @@ mod tests {
     fn xft_fallback() {
         let c = ctx(&[], &[("xrdb -query", "Xft.dpi:\t120\n")], &[]);
         assert_eq!(detect(&c), 1.25);
+    }
+
+    #[test]
+    fn test_window_env() {
+        use std::collections::HashMap;
+        let helper = PathBuf::from("/tmp/wayland-test-missing.so");
+        let backend = Ctx { env: HashMap::new(), files: HashMap::new(), commands: HashMap::new(), live: false };
+        let x11 = super::window_environment("x11", &helper).unwrap();
+        assert!(x11.contains(&("MACNCHEESE_WAYLAND".into(), "0".into())));
+        assert!(super::window_environment("bogus", &helper).is_err());
+        std::env::set_var("WAYLAND_DISPLAY", "wayland-9");
+        assert!(super::window_environment("wayland", &helper).is_err()); // helper missing
+        std::env::remove_var("WAYLAND_DISPLAY");
+        let _ = backend;
     }
 }

@@ -21,8 +21,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs},
-    Terminal,
+    widgets::{Block, Borders, List, ListItem, ListState, Padding, Paragraph, Tabs},
 };
 use serde_json::{Map, Value};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -135,10 +134,10 @@ impl App {
             update_rx,
             clicks: Vec::new(),
         };
-        // First run: open Setup and start it right away. Never again.
+        // First run: open Setup with an explanation. Nothing runs
+        // until the user confirms (yes/no).
         if !done {
             app.tab = app.tabs.iter().position(|t| *t == Tab::Setup).unwrap_or(0);
-            app.run_setup();
         }
         app.spawn_update_check();
         app
@@ -551,7 +550,10 @@ fn apply_detected_scale() {
 // ---------------------------------------------------------------- ui
 
 fn title_block(title: &str) -> Block<'static> {
-    Block::default().borders(Borders::ALL).title(title.to_string())
+    Block::default()
+        .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
+        .title(title.to_string())
 }
 
 pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
@@ -562,7 +564,12 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
 
     let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
     let tabs = Tabs::new(titles)
-        .block(Block::default().borders(Borders::ALL).title("Mac'n Cheese"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .padding(Padding::horizontal(1))
+                .title(" Mac'n Cheese "),
+        )
         .select(app.tab)
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
@@ -729,8 +736,17 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
 }
 
 fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+    let explainer = vec![
+        Line::from("First run: Mac'n Cheese will:"),
+        Line::from("  1. Download the Roblox client (~300 MB)"),
+        Line::from("  2. Build the compatibility libraries"),
+        Line::from("  3. Prepare the Darling prefix"),
+        Line::from(""),
+        Line::from("Nothing runs until you confirm. Continue?"),
+        Line::from(""),
+    ];
     let (state, color) = match &app.setup {
-        SetupState::Idle => ("First run: press Enter to install Roblox.".to_string(), Color::White),
+        SetupState::Idle => (String::new(), Color::White),
         SetupState::Running(step) => (format!("… {step}"), Color::Yellow),
         SetupState::Done(msg) => (format!("✓ {msg}"), Color::Green),
         SetupState::Failed(err) => (format!("✗ {err}"), Color::Red),
@@ -739,12 +755,15 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(area);
+    let mut lines = explainer;
+    if !state.is_empty() {
+        lines.push(Line::from(Span::styled(state, Style::default().fg(color))));
+    }
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(state, Style::default().fg(color))))
-            .block(title_block("Setup")),
+        Paragraph::new(lines).block(title_block("Setup")),
         chunks[0],
     );
-    clickable_button(f, app, chunks[1], "Run setup", Action::SetupRun);
+    clickable_button(f, app, chunks[1], "Yes, run setup", Action::SetupRun);
 }
 
 // ---------------------------------------------------------------- settings rows
@@ -756,11 +775,17 @@ pub(crate) fn rows() -> Vec<Row> {
             title: "Renderer",
             options: vec![("opengl", "OpenGL"), ("vulkan", "Vulkan (Zink, experimental)")],
         },
+        Row::Cycle {
+            key: "display_backend",
+            title: "Window backend",
+            options: vec![("x11", "X11 / Xwayland"), ("wayland", "Native Wayland (experimental)")],
+        },
         Row::Number { key: "dpi_scale", title: "Roblox UI scale", min: 1.0, max: 4.0, step: 0.05, pct: true },
         Row::Number { key: "mouse_sensitivity", title: "Camera sensitivity", min: 0.1, max: 5.0, step: 0.05, pct: false },
         Row::Bool { key: "raw_mouse", title: "Raw mouse input", default: true },
         Row::Bool { key: "hide_menu_bar", title: "Hide the macOS menu bar", default: true },
         Row::Bool { key: "mangohud", title: "MangoHud overlay", default: false },
+        Row::Number { key: "tui_font_scale", title: "TUI font scale", min: 0.8, max: 2.0, step: 0.1, pct: false },
     ]
 }
 
@@ -827,6 +852,7 @@ impl Row {
 #[cfg(test)]
 mod tui_tests {
     use super::*;
+    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
     fn drawn(app: &mut App) -> String {

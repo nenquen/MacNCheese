@@ -207,7 +207,7 @@ fn darling_shutdown() {
 /// Copy stub frameworks into the stopped prefix's upper layer.
 pub fn prepare_prefix() -> Result<(), String> {
     if !paths::darling_prefix().is_dir() {
-        let env = base_env();
+        let env = base_env(false);
         let _ = Command::new("darling")
             .args(["shell", "true"])
             .envs(&env)
@@ -228,9 +228,14 @@ pub fn prepare_prefix() -> Result<(), String> {
     Ok(())
 }
 
-fn base_env() -> HashMap<String, String> {
+fn base_env(wayland: bool) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = std::env::vars().collect();
-    env.insert("EGL_PLATFORM".into(), "x11".into());
+    if wayland {
+        env.insert("EGL_PLATFORM".into(), "wayland".into());
+        env.remove("DISPLAY");
+    } else {
+        env.insert("EGL_PLATFORM".into(), "x11".into());
+    }
     env
 }
 
@@ -256,7 +261,7 @@ fn host_vram_bytes() -> Option<u64> {
     Some(best.unwrap_or(512 * 1024 * 1024))
 }
 
-fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Vec<String> {
+fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Result<(Vec<String>, bool), String> {
     let get = |k: &str| settings.get(k);
     let f64_of = |k: &str, d: f64| get(k).and_then(|v| v.as_f64()).unwrap_or(d);
     let bool_of = |k: &str, d: bool| get(k).and_then(|v| v.as_bool()).unwrap_or(d);
@@ -274,8 +279,26 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Vec<
         .map(crate::settings::validated_dpi_scale)
         .unwrap_or(1.0);
     vars.push(format!("MACNCHEESE_DPI_SCALE={dpi:.3}"));
-    vars.push("MACNCHEESE_WAYLAND=0".into());
-    vars.push("EGL_PLATFORM=x11".into());
+    let backend = settings
+        .get("display_backend")
+        .and_then(|v| v.as_str())
+        .unwrap_or("x11");
+    let helper = crate::paths::shim().parent()
+        .map(|p| p.join("libmacncheese-wayland.so"))
+        .unwrap_or_default();
+    let wayland = match crate::display::window_environment(backend, &helper) {
+        Ok(pairs) => {
+            let mut is_wayland = false;
+            for (k, v) in pairs {
+                if k == "MACNCHEESE_WAYLAND" && v == "1" {
+                    is_wayland = true;
+                }
+                vars.push(format!("{k}={v}"));
+            }
+            is_wayland
+        }
+        Err(e) => return Err(e),
+    };
     if let Some(vram) = host_vram_bytes() {
         vars.push(format!("MACNCHEESE_VRAM_BYTES={vram}"));
     }
@@ -298,7 +321,7 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Vec<
             vars.push(format!("{name}=1"));
         }
     }
-    vars
+    Ok((vars, wayland))
 }
 
 pub struct Session {
@@ -327,7 +350,7 @@ impl Session {
         crate::update::ensure_launch_patches();
         crate::mods::apply(settings);
 
-        let mut vars = shim_variables(settings);
+        let (mut vars, wayland) = shim_variables(settings)?;
         let audio = Audio::start();
         match &audio {
             Some(a) => {
@@ -340,7 +363,7 @@ impl Session {
         // Warm the server: the first process after start can fail check-in.
         let t1 = Instant::now();
         if !darlingserver_running() {
-            let env = base_env();
+            let env = base_env(wayland);
             let _ = Command::new("darling")
                 .args(["shell", "true"])
                 .envs(&env)
@@ -395,7 +418,7 @@ impl Session {
         let stderr = log_file.try_clone().map_err(|e| format!("log: {e}"))?;
         let child = Command::new("darling")
             .args(&command[1..])
-            .envs(base_env())
+            .envs(base_env(wayland))
             .stdin(Stdio::null())
             .stdout(log_file)
             .stderr(stderr)
