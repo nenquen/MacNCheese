@@ -35,9 +35,15 @@ fn desktop_file(exe: &str) -> String {
 /// Install/refresh ~/.local/share/applications/<APP_ID>.desktop and the
 /// hicolor icons. Only writes missing or outdated files.
 pub fn ensure_menu_entry() {
-    let exe = std::env::current_exe()
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "macncheese".into());
+    // Inside an AppImage the binary lives under a volatile FUSE mount:
+    // point Exec at the stable AppImage path instead, or KWin treats the
+    // entry as broken and shows a generic icon.
+    let exe = match std::env::var("APPIMAGE") {
+        Ok(p) if !p.is_empty() => p,
+        _ => std::env::current_exe()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "macncheese".into()),
+    };
     let desktop = desktop_file(&exe);
     let apps = data_home().join("applications");
     let target = apps.join(format!("{APP_ID}.desktop"));
