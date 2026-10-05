@@ -134,7 +134,6 @@ mod tests {
         std::env::remove_var("MACNCHEESE_FLAGS_FILE");
         let _ = std::fs::remove_dir_all(&dir);
     }
-}
 
     #[test]
     fn value_parsing() {
