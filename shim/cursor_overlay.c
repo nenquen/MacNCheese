@@ -159,8 +159,10 @@ int macncheese_cursor_overlay_update(int locked, XID game_window, int visible) {
     }
     if (!resolve()) return 0;
     if (!visible) {
-        if (overlay) p_XUnmapWindow(display, overlay);
-        last_serial = 0;
+        /* The game hid its own cursor mid-lock (camera rotate): freeze the
+         * last snapshot where it is, like CGAssociateMouseAndMouseCursorPosition
+         * does on macOS. Unmapping here would leave no cursor at all: the
+         * hardware cursor is already hidden for the relative-pointer lock. */
         p_XFlush(display);
         return 1;
     }

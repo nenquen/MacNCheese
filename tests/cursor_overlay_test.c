@@ -46,7 +46,8 @@ int main(void) {
     assert(attrs.map_state == IsViewable && attrs.x == 76 && attrs.y == 86);
     assert(macncheese_cursor_overlay_update(1, game, 0));
     XSync(display, False);
-    assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsUnmapped);
+    assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsViewable);
+    assert(attrs.x == 76 && attrs.y == 86);
     assert(macncheese_cursor_overlay_update(1, game, 1));
     XSync(display, False);
     assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsViewable);
@@ -57,5 +58,5 @@ int main(void) {
     XDestroyWindow(d, game); XSync(d, False);
     macncheese_cursor_overlay_update(0, 0, 1); XSync(display, False);
     XCloseDisplay(d);
-    puts("PASS: visible pixels, frozen hotspot, empty input shape, hide/unhide, unlock, window destruction");
+    puts("PASS: visible pixels, frozen hotspot, empty input shape, game-hidden freeze, unlock, window destruction");
 }
