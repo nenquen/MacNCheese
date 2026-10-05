@@ -26,6 +26,19 @@ fn nz(v: u32) -> NonZeroU32 {
     NonZeroU32::new(v.max(1)).unwrap()
 }
 
+/// Wayland app_id matching our .desktop file, so the compositor shows the
+/// cheese icon instead of the generic Wayland one.
+#[cfg(target_os = "linux")]
+fn with_app_id(attrs: WindowAttributes) -> WindowAttributes {
+    use winit::platform::wayland::WindowAttributesExtWayland;
+    attrs.with_name("org.macncheese.MacNCheese", "macncheese")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn with_app_id(attrs: WindowAttributes) -> WindowAttributes {
+    attrs
+}
+
 fn find_mono_font() -> Option<Vec<u8>> {
     let mut candidates = vec![];
     if let Ok(out) = std::process::Command::new("fc-match")
@@ -148,6 +161,7 @@ impl ApplicationHandler for Gui {
         let mut attrs = WindowAttributes::default()
             .with_title("Mac'n Cheese")
             .with_inner_size(winit::dpi::LogicalSize::new(WIN_W, WIN_H));
+        attrs = with_app_id(attrs);
         if let Some(icon) = window_icon() {
             attrs = attrs.with_window_icon(Some(icon));
         }
@@ -166,6 +180,8 @@ impl ApplicationHandler for Gui {
         };
         let backend = futures_lite::future::block_on(
             Builder::from_font(font)
+                .with_bg_color(ratatui::style::Color::Black)
+                .with_fg_color(ratatui::style::Color::White)
                 .with_width_and_height(Dimensions { width: nz(WIN_W), height: nz(WIN_H) })
                 .build_with_target(window.clone()),
         )
