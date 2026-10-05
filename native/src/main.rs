@@ -58,6 +58,7 @@ enum Action {
     FlagRow(usize),
     LogRow(usize),
     SetupRun,
+    AddFlag,
 }
 
 enum StartMsg {
@@ -111,7 +112,6 @@ pub struct App {
 #[derive(Clone)]
 enum FlagRow {
     Custom { key: String, value: String },
-    Add,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -571,15 +571,12 @@ impl App {
         out
     }
 
-    /// Selectable rows: customs, [+ Add].
+    /// Selectable rows: user customs only.
     fn flag_rows(&self) -> Vec<FlagRow> {
-        let mut rows: Vec<FlagRow> = self
-            .custom_flags()
+        self.custom_flags()
             .into_iter()
             .map(|(key, value)| FlagRow::Custom { key, value })
-            .collect();
-        rows.push(FlagRow::Add);
-        rows
+            .collect()
     }
 
     fn save_flag(&self, key: &str, raw: &str) {
@@ -600,7 +597,6 @@ impl App {
             Some(FlagRow::Custom { key, value }) => {
                 self.flag_edit = Some(FlagEdit::value(key.clone(), value.clone()));
             }
-            Some(FlagRow::Add) => self.flag_edit = Some(FlagEdit::name()),
             None => {}
         }
     }
@@ -610,7 +606,6 @@ impl App {
             Some(FlagRow::Custom { key, value }) => {
                 self.flag_edit = Some(FlagEdit::value(key.clone(), value.clone()));
             }
-            Some(FlagRow::Add) => self.flag_edit = Some(FlagEdit::name()),
             _ => self.activate_flag(),
         }
     }
@@ -729,6 +724,10 @@ impl App {
                 self.activate_flag();
                 KeyAction::None
             }
+            Some(Action::AddFlag) => {
+                self.flag_edit = Some(FlagEdit::name());
+                KeyAction::None
+            }
             Some(Action::SetupRun) => {
                 self.run_setup();
                 KeyAction::None
@@ -823,10 +822,21 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         .constraints([Constraint::Length(3), Constraint::Min(0)])
         .split(f.area());
 
-    let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
+    let titles: Vec<String> = app
+        .tabs
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            if i == 0 {
+                format!(" {}", t.title())
+            } else {
+                t.title().to_string()
+            }
+        })
+        .collect();
     let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
     let pal = crate::theme::resolve(mode);
-    let tabs = Tabs::new(titles)
+    let tabs = Tabs::new(titles.clone())
         .divider(Span::raw(" | "))
         .block(title_block(&pal, "Mac'n Cheese"))
         .select(app.tab)
@@ -838,8 +848,8 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let bar = chunks[0];
     {
         let mut x = bar.x + 1;
-        for (i, tab) in app.tabs.iter().enumerate() {
-            let w = (tab.title().len() + 2) as u16;
+        for (i, title) in titles.iter().enumerate() {
+            let w = (title.len() + 2) as u16;
             if x + w <= bar.x + bar.width.saturating_sub(1) {
                 app.clicks.push((Rect::new(x, bar.y + 1, w, 1), Action::Tab(i)));
             }
@@ -943,7 +953,6 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
             };
             let text = match row {
                 FlagRow::Custom { key, value } => format!("{key} = {value}"),
-                FlagRow::Add => "[+] Add flag".to_string(),
             };
             app.clicks.push((
                 Rect::new(chunks[0].x + 1, chunks[0].y + 1 + i as u16, chunks[0].width.saturating_sub(2), 1),
@@ -957,19 +966,38 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
         chunks[0],
         &mut app.flags_state,
     );
-    let editor = match &app.flag_edit {
+    let editor: Vec<Span> = match &app.flag_edit {
         Some(ed) => {
             let prompt = match ed.stage {
                 EditStage::Name => "Flag name".to_string(),
                 EditStage::Value => format!("Value for {}", ed.name),
             };
-            format!("{prompt}: {}▌", ed.buf)
+            vec![
+                Span::styled(prompt + ": ", Style::default().fg(pal.accent)),
+                Span::styled(format!("{}▌", ed.buf), Style::default().fg(pal.fg)),
+            ]
         }
-        None => "a: add · Enter: edit · d: delete".to_string(),
+        None => [( "a", "add"), ("Enter", "edit"), ("d", "delete")]
+            .into_iter()
+            .flat_map(|(key, desc)| {
+                [
+                    Span::styled(format!(" {key}"), Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)),
+                    Span::styled(format!(": {desc}  "), Style::default().fg(pal.dim)),
+                ]
+            })
+            .collect(),
     };
+    let bar = chunks[1];
+    // The whole hint bar is clickable: starts the add flow.
+    if app.flag_edit.is_none() {
+        app.clicks.push((
+            Rect::new(bar.x + 1, bar.y + 1, bar.width.saturating_sub(2), 1),
+            Action::AddFlag,
+        ));
+    }
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(editor, Style::default().fg(pal.dim)))).block(title_block(pal, "")),
-        chunks[1],
+        Paragraph::new(Line::from(editor)).block(title_block(pal, "")),
+        bar,
     );
 }
 
