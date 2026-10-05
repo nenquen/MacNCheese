@@ -6,6 +6,7 @@ mod settings;
 mod paths;
 mod audio;
 mod session;
+mod settings_page;
 
 use adw::prelude::*;
 use gtk::glib;
@@ -19,7 +20,8 @@ fn main() -> glib::ExitCode {
         .build();
 
     app.connect_activate(|app| {
-        let store = settings::load();
+        let store: settings_page::Store =
+            Arc::new(Mutex::new(settings::load()));
         let session: Arc<Mutex<Option<session::Session>>> = Arc::new(Mutex::new(None));
         let (tx, rx) = std::sync::mpsc::channel::<
             Result<session::Session, String>,
@@ -61,7 +63,8 @@ fn main() -> glib::ExitCode {
                 let tx = tx.clone();
                 let store = store.clone();
                 std::thread::spawn(move || {
-                    let _ = tx.send(session::Session::start(&store));
+                    let snapshot = store.lock().unwrap().clone();
+                    let _ = tx.send(session::Session::start(&snapshot));
                 });
             });
         }
@@ -107,6 +110,8 @@ fn main() -> glib::ExitCode {
 
         let stack = adw::ViewStack::new();
         stack.add_titled_with_icon(&play, Some("play"), "Play", "macncheese-nav-play");
+        let settings_ui = settings_page::page(&store);
+        stack.add_titled_with_icon(&settings_ui, Some("settings"), "Settings", "macncheese-nav-settings");
 
         let sidebar = adw::ViewSwitcherSidebar::builder().stack(&stack).build();
         let split = adw::OverlaySplitView::builder()
