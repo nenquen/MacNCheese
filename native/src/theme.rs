@@ -1,15 +1,27 @@
-//! Color themes: System (from the desktop), Dark, Light.
-//! OpenCode-style: "system" follows the OS, the rest are fixed palettes.
+//! Color themes, OpenCode-style: named slots, built-ins embedded in the
+//! binary, user overrides in ~/.config/macncheese/themes/*.json.
+//!
+//! Slots: background, text, muted, accent, ok, warn, err, border.
 
 use ratatui::style::Color;
+use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct Palette {
     pub bg: Color,
     pub fg: Color,
     pub accent: Color,
     pub dim: Color,
     pub ok: Color,
+    pub warn: Color,
     pub err: Color,
+    pub border: Color,
+}
+
+fn rgb(hex: &str) -> Color {
+    let h = hex.trim_start_matches('#');
+    let n = u32::from_str_radix(h, 16).unwrap_or(0);
+    Color::Rgb(((n >> 16) & 0xff) as u8, ((n >> 8) & 0xff) as u8, (n & 0xff) as u8)
 }
 
 pub static DARK: Palette = Palette {
@@ -18,25 +30,9 @@ pub static DARK: Palette = Palette {
     accent: Color::Yellow,
     dim: Color::DarkGray,
     ok: Color::Green,
+    warn: Color::Yellow,
     err: Color::Red,
-};
-
-pub static CATPPUCCIN: Palette = Palette {
-    bg: Color::Rgb(30, 30, 46),
-    fg: Color::Rgb(205, 214, 244),
-    accent: Color::Rgb(203, 166, 247),
-    dim: Color::Rgb(108, 112, 134),
-    ok: Color::Rgb(166, 227, 161),
-    err: Color::Rgb(243, 139, 168),
-};
-
-pub static ROSE_PINE: Palette = Palette {
-    bg: Color::Rgb(25, 23, 36),
-    fg: Color::Rgb(224, 222, 244),
-    accent: Color::Rgb(196, 167, 231),
-    dim: Color::Rgb(110, 106, 134),
-    ok: Color::Rgb(156, 207, 216),
-    err: Color::Rgb(235, 111, 146),
+    border: Color::DarkGray,
 };
 
 pub static LIGHT: Palette = Palette {
@@ -45,8 +41,153 @@ pub static LIGHT: Palette = Palette {
     accent: Color::Blue,
     dim: Color::Gray,
     ok: Color::Green,
+    warn: Color::Yellow,
     err: Color::Red,
+    border: Color::Gray,
 };
+
+pub static CATPPUCCIN: Palette = Palette {
+    bg: Color::Rgb(30, 30, 46),
+    fg: Color::Rgb(205, 214, 244),
+    accent: Color::Rgb(203, 166, 247),
+    dim: Color::Rgb(108, 112, 134),
+    ok: Color::Rgb(166, 227, 161),
+    warn: Color::Rgb(249, 226, 175),
+    err: Color::Rgb(243, 139, 168),
+    border: Color::Rgb(88, 91, 112),
+};
+
+pub static CATPPUCCIN_LATTE: Palette = Palette {
+    bg: Color::Rgb(239, 241, 245),
+    fg: Color::Rgb(76, 79, 105),
+    accent: Color::Rgb(136, 57, 239),
+    dim: Color::Rgb(156, 160, 176),
+    ok: Color::Rgb(64, 160, 43),
+    warn: Color::Rgb(223, 142, 29),
+    err: Color::Rgb(210, 15, 57),
+    border: Color::Rgb(204, 208, 218),
+};
+
+pub static ROSE_PINE: Palette = Palette {
+    bg: Color::Rgb(25, 23, 36),
+    fg: Color::Rgb(224, 222, 244),
+    accent: Color::Rgb(196, 167, 231),
+    dim: Color::Rgb(110, 106, 134),
+    ok: Color::Rgb(156, 207, 216),
+    warn: Color::Rgb(246, 193, 119),
+    err: Color::Rgb(235, 111, 146),
+    border: Color::Rgb(64, 61, 82),
+};
+
+pub static ROSE_PINE_DAWN: Palette = Palette {
+    bg: Color::Rgb(250, 244, 237),
+    fg: Color::Rgb(87, 82, 121),
+    accent: Color::Rgb(144, 122, 169),
+    dim: Color::Rgb(152, 147, 165),
+    ok: Color::Rgb(86, 148, 159),
+    warn: Color::Rgb(234, 157, 52),
+    err: Color::Rgb(180, 99, 122),
+    border: Color::Rgb(220, 211, 197),
+};
+
+pub static TOKYONIGHT: Palette = Palette {
+    bg: Color::Rgb(26, 27, 38),
+    fg: Color::Rgb(192, 202, 245),
+    accent: Color::Rgb(122, 162, 247),
+    dim: Color::Rgb(86, 95, 137),
+    ok: Color::Rgb(158, 206, 106),
+    warn: Color::Rgb(224, 175, 104),
+    err: Color::Rgb(247, 118, 142),
+    border: Color::Rgb(59, 66, 97),
+};
+
+pub static NORD: Palette = Palette {
+    bg: Color::Rgb(46, 52, 64),
+    fg: Color::Rgb(216, 222, 233),
+    accent: Color::Rgb(136, 192, 208),
+    dim: Color::Rgb(76, 86, 106),
+    ok: Color::Rgb(163, 190, 140),
+    warn: Color::Rgb(235, 203, 139),
+    err: Color::Rgb(191, 97, 106),
+    border: Color::Rgb(67, 76, 94),
+};
+
+pub static GRUVBOX: Palette = Palette {
+    bg: Color::Rgb(40, 40, 40),
+    fg: Color::Rgb(235, 219, 178),
+    accent: Color::Rgb(250, 189, 47),
+    dim: Color::Rgb(146, 131, 116),
+    ok: Color::Rgb(184, 187, 38),
+    warn: Color::Rgb(254, 128, 25),
+    err: Color::Rgb(251, 73, 52),
+    border: Color::Rgb(80, 73, 69),
+};
+
+pub fn builtin(name: &str) -> Option<&'static Palette> {
+    Some(match name {
+        "dark" => &DARK,
+        "light" => &LIGHT,
+        "catppuccin" | "catppuccin-mocha" => &CATPPUCCIN,
+        "catppuccin-latte" => &CATPPUCCIN_LATTE,
+        "rose-pine" | "rosepine" | "rose" => &ROSE_PINE,
+        "rose-pine-dawn" => &ROSE_PINE_DAWN,
+        "tokyonight" | "tokyo-night" => &TOKYONIGHT,
+        "nord" => &NORD,
+        "gruvbox" => &GRUVBOX,
+        _ => return None,
+    })
+}
+
+pub fn names() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("system", "System"),
+        ("dark", "Dark"),
+        ("light", "Light"),
+        ("catppuccin", "Catppuccin"),
+        ("catppuccin-latte", "Catppuccin Latte"),
+        ("rose-pine", "Rosé Pine"),
+        ("rose-pine-dawn", "Rosé Pine Dawn"),
+        ("tokyonight", "TokyoNight"),
+        ("nord", "Nord"),
+        ("gruvbox", "Gruvbox"),
+    ]
+}
+
+/// User overrides from ~/.config/macncheese/themes/*.json.
+/// Any subset of bg/fg/accent/dim/ok/warn/err/border as "#rrggbb".
+pub fn custom(name: &str) -> Option<Palette> {
+    let base = dirs::home_dir()?.join(".config/macncheese/themes");
+    let mut found = None;
+    for entry in std::fs::read_dir(&base).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "json")
+            && path.file_stem().is_some_and(|s| s == name)
+        {
+            found = Some(path);
+            break;
+        }
+    }
+    // Fall back to the closest built-in for missing slots.
+    let base = builtin(name).unwrap_or(&DARK).clone();
+    let path = found?;
+    let json: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+    let pick = |key: &str, current: Color| {
+        json.get(key)
+            .and_then(|v| v.as_str())
+            .map(rgb)
+            .unwrap_or(current)
+    };
+    Some(Palette {
+        bg: pick("bg", base.bg),
+        fg: pick("fg", base.fg),
+        accent: pick("accent", base.accent),
+        dim: pick("dim", base.dim),
+        ok: pick("ok", base.ok),
+        warn: pick("warn", base.warn),
+        err: pick("err", base.err),
+        border: pick("border", base.border),
+    })
+}
 
 /// True when the desktop is in dark mode (portal first, desktops second).
 pub fn system_dark() -> bool {
@@ -71,7 +212,7 @@ pub fn system_dark() -> bool {
             return true;
         }
     }
-    if let Ok(text) = std::fs::read_to_string(dirs_home().join(".config/kdeglobals")) {
+    if let Ok(text) = std::fs::read_to_string(dirs::home_dir().unwrap_or_default().join(".config/kdeglobals")) {
         for line in text.lines() {
             let line = line.trim().to_lowercase();
             if line.starts_with("colorscheme") {
@@ -82,24 +223,16 @@ pub fn system_dark() -> bool {
     true
 }
 
-fn dirs_home() -> std::path::PathBuf {
-    dirs::home_dir().unwrap_or_default()
-}
-
-pub fn resolve(mode: &str) -> &'static Palette {
-    match mode {
-        "dark" => &DARK,
-        "light" => &LIGHT,
-        "catppuccin" => &CATPPUCCIN,
-        "rose-pine" | "rosepine" | "rose" => &ROSE_PINE,
-        _ => {
-            if system_dark() {
-                &DARK
-            } else {
-                &LIGHT
-            }
-        }
+pub fn resolve(mode: &str) -> Palette {
+    if mode == "system" {
+        return if system_dark() { DARK.clone() } else { LIGHT.clone() };
     }
+    if let Some(custom) = custom(mode) {
+        return custom;
+    }
+    builtin(mode).cloned().unwrap_or_else(|| {
+        if system_dark() { DARK.clone() } else { LIGHT.clone() }
+    })
 }
 
 #[cfg(test)]
@@ -107,18 +240,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn palettes_resolve() {
-        assert!(std::ptr::eq(resolve("dark"), &DARK));
-        assert!(std::ptr::eq(resolve("light"), &LIGHT));
-        let sys = resolve("system");
-        assert!(std::ptr::eq(sys, &DARK) || std::ptr::eq(sys, &LIGHT));
+    fn known_themes() {
+        for name in ["dark", "light", "catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
+            assert!(builtin(name).is_some(), "{name}");
+        }
     }
 
     #[test]
-    fn theme_names_resolve() {
-        assert!(std::ptr::eq(resolve("catppuccin"), &CATPPUCCIN));
-        assert!(std::ptr::eq(resolve("rose-pine"), &ROSE_PINE));
-        assert!(std::ptr::eq(resolve("rose"), &ROSE_PINE));
-        assert!(std::ptr::eq(resolve("nope"), resolve("system")));
+    fn unknown_falls_back() {
+        let pal = resolve("nope");
+        assert!(matches!(pal.bg, Color::Black | Color::White));
+    }
+
+    #[test]
+    fn hex_parsing() {
+        assert!(matches!(rgb("#cba6f7"), Color::Rgb(203, 166, 247)));
     }
 }

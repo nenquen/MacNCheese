@@ -550,9 +550,10 @@ fn apply_detected_scale() {
 
 // ---------------------------------------------------------------- ui
 
-fn title_block(title: &str) -> Block<'static> {
+fn title_block(pal: &crate::theme::Palette, title: &str) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
+        .border_style(ratatui::style::Style::default().fg(pal.border))
         .padding(Padding::horizontal(1))
         .title(format!(" {title} "))
 }
@@ -593,11 +594,11 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     }
 
     match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
-        Tab::Play => render_play(f, app, pal, chunks[1]),
-        Tab::Settings => render_settings(f, app, pal, chunks[1]),
-        Tab::Flags => render_flags(f, app, pal, chunks[1]),
-        Tab::Logs => render_logs(f, app, pal, chunks[1]),
-        Tab::Setup => render_setup(f, app, pal, chunks[1]),
+        Tab::Play => render_play(f, app, &pal, chunks[1]),
+        Tab::Settings => render_settings(f, app, &pal, chunks[1]),
+        Tab::Flags => render_flags(f, app, &pal, chunks[1]),
+        Tab::Logs => render_logs(f, app, &pal, chunks[1]),
+        Tab::Setup => render_setup(f, app, &pal, chunks[1]),
     }
 
     let hint = match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
@@ -647,13 +648,13 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(area);
     f.render_widget(
-        Paragraph::new(lines).block(title_block("Play")),
+        Paragraph::new(lines).block(title_block(pal, "Play")),
         chunks[0],
     );
     let btn = chunks[1];
     let label = if running { "Stop" } else { "Play Roblox" };
     // Reserve the button row, then draw centered inside it.
-    f.render_widget(Paragraph::new("").block(title_block("")), btn);
+    f.render_widget(Paragraph::new("").block(title_block(pal, "")), btn);
     clickable_button(f, app, pal, Rect::new(btn.x + 1, btn.y + 1, btn.width.saturating_sub(2), 1), label, Action::PlayToggle);
 }
 
@@ -675,7 +676,7 @@ fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Pa
             ListItem::new(Line::from(Span::styled(row.describe(&app.settings), style)))
         })
         .collect();
-    f.render_widget(List::new(items).block(title_block("Settings")), area);
+    f.render_widget(List::new(items).block(title_block(pal, "Settings")), area);
 }
 
 fn render_flags(f: &mut ratatui::Frame, _app: &mut App, pal: &crate::theme::Palette, area: Rect) {
@@ -690,7 +691,7 @@ fn render_flags(f: &mut ratatui::Frame, _app: &mut App, pal: &crate::theme::Pale
         let value = &flags[*key];
         lines.push(Line::from(format!("{key} = {}", value.as_str().unwrap_or("?"))));
     }
-    f.render_widget(Paragraph::new(lines).block(title_block("Fast flags")), area);
+    f.render_widget(Paragraph::new(lines).block(title_block(pal, "Fast flags")), area);
 }
 
 fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
@@ -714,7 +715,7 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
         .collect();
     f.render_stateful_widget(
         List::new(items)
-            .block(title_block("Logs"))
+            .block(title_block(pal, "Logs"))
             .highlight_style(Style::default().fg(pal.accent)),
         chunks[0],
         &mut app.logs_state,
@@ -730,7 +731,7 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
             lines[n.saturating_sub(40)..].join("\n")
         })
         .unwrap_or_default();
-    f.render_widget(Paragraph::new(tail).block(title_block("Tail")), chunks[1]);
+    f.render_widget(Paragraph::new(tail).block(title_block(pal, "Tail")), chunks[1]);
 }
 
 fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
@@ -758,7 +759,7 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
         lines.push(Line::from(Span::styled(state, Style::default().fg(color))));
     }
     f.render_widget(
-        Paragraph::new(lines).block(title_block("Setup")),
+        Paragraph::new(lines).block(title_block(pal, "Setup")),
         chunks[0],
     );
     clickable_button(f, app, pal, chunks[1], "Yes, run setup", Action::SetupRun);
@@ -787,8 +788,7 @@ pub(crate) fn setting_rows() -> Vec<Row> {
         Row::Cycle {
             key: "theme",
             title: "Color theme",
-            options: [("system", "System"), ("dark", "Dark"), ("light", "Light"),
-                      ("catppuccin", "Catppuccin"), ("rose-pine", "Rosé Pine")]
+            options: crate::theme::names()
                 .into_iter()
                 .map(|(a, b)| (a.to_string(), b.to_string()))
                 .collect(),
