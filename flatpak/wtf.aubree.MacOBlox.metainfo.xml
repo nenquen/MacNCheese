@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>wtf.aubree.MacOBlox</id>
+  <name>Mac O’ Blox</name>
+  <summary>Play Roblox on Linux with the macOS client</summary>
+  <summary xml:lang="ru">Roblox на Linux через клиент для macOS</summary>
+  <developer id="wtf.aubree">
+    <name>aubree.wtf</name>
+  </developer>
+  <replaces>
+    <id>xyz.narez.MacOBlox</id>
+  </replaces>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Mac O’ Blox runs the official macOS Roblox client on Linux through Darling,
+      with fixes for graphics, input, sound and performance. The launcher keeps
+      the client up to date and has settings for fast flags, DNS and diagnostics.
+    </p>
+    <p xml:lang="ru">
+      Mac O’ Blox запускает официальный клиент Roblox для macOS на Linux через Darling
+      и чинит графику, ввод, звук и производительность. Лаунчер сам обновляет клиент,
+      в нём есть настройки фастфлагов, DNS и диагностика.
+    </p>
+    <p>Created by Narezany; this version is maintained by aubree.wtf.</p>
+    <p xml:lang="ru">Создал Narezany; эту версию поддерживает aubree.wtf.</p>
+    <p>Mac O’ Blox is not affiliated with Roblox Corporation.</p>
+    <p xml:lang="ru">Mac O’ Blox не связан с Roblox Corporation.</p>
+  </description>
+  <launchable type="desktop-id">wtf.aubree.MacOBlox.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/flatpak/screenshots/roblox.png</image>
+      <caption>Roblox running through Mac O’ Blox</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/flatpak/screenshots/launcher-play.png</image>
+      <caption>The launcher</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/flatpak/screenshots/launcher-flags.png</image>
+      <caption>Fast flags</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/flatpak/screenshots/launcher-settings.png</image>
+      <caption>Settings</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/flatpak/screenshots/launcher-info.png</image>
+      <caption>Community and authors</caption>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://github.com/aubree-lat/MacOBlox</url>
+  <url type="bugtracker">https://github.com/aubree-lat/MacOBlox/issues</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#c4b5fd</color>
+    <color type="primary" scheme_preference="dark">#3b2a7a</color>
+  </branding>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">moderate</content_attribute>
+    <content_attribute id="money-purchasing">intense</content_attribute>
+  </content_rating>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <releases>
+    <release version="0.19" date="2026-10-04">
+      <description>
+        <p>Fixes invisible X11 cursors with Vulkan (Zink), removes unnecessary serialization of independent DNS lookups, and adds adjustable Roblox UI scaling from 100–400%. Improves Flatpak graphics discovery and Vulkan error messages. Repairs experimental Wayland EGL drawables, window lookup and NVIDIA driver discovery. The leave-game pause remains unresolved; Native Wayland and Zink remain experimental. Direct client Vulkan and custom Darlingserver experiments are not included.</p>
+      </description>
+    </release>
+    <release version="0.18" date="2026-10-04">
+      <description>
+        <p>Adds a welcome and first-time setup guide. Fixes raw mouse and camera freezes, restores mouse capture after focus changes, repairs Private Servers rendering crashes, and improves Zink context and shader compatibility. Reduces Darling file-close cleanup delays and keeps process cleanup within the selected app environment. A later pause after leaving games remains under investigation. Native Wayland and Zink remain experimental.</p>
+      </description>
+    </release>
+    <release version="0.17" date="2026-10-03">
+      <description>
+        <p>Restores the standard GNOME interface. Adds an experimental Vulkan renderer through Mesa Zink and an optional MangoHud overlay for OpenGL and Vulkan. Improves cursor visibility during camera capture, contended locks, shader compatibility and persistent GPU caching. Fixes Linux builds failing because dsymutil is unavailable.</p>
+      </description>
+    </release>
+    <release version="0.16" date="2026-10-01">
+      <description>
+        <p>A new launcher interface: a dark desktop with a console that shows what is installed and ready. Raw mouse input for the camera, Discord Rich Presence, playtime, mods (sounds, cursors, fonts), a log viewer with search, and Play links from the browser. Fixes for freezes when leaving a game and when quitting.</p>
+      </description>
+    </release>
+    <release version="0.15" date="2026-09-27">
+      <description>
+        <p>Signing in with a password and other embedded pages open in the launcher's own browser window. Microphone for voice chat. New app ID wtf.aubree.MacOBlox. Fixes for a Fedora KDE crash loop, for Darling's thread stacks, and for the Flatpak failing with "Cannot determine your user name".</p>
+      </description>
+    </release>
+    <release version="0.14" date="2026-09-26">
+      <description>
+        <p>Fixes for freezes, stutter, audio dropouts and slow loading, and the Roblox sign-in cookie is only sent to Roblox.</p>
+      </description>
+    </release>
+    <release version="0.13" date="2026-09-24"/>
+  </releases>
+</component>

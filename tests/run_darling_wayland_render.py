@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Optional native Wayland AppKit fixture; never uses an installed prefix.
+
+Run after other desktop tests stop:
+  python tests/run_darling_wayland_render.py --build-dir /path/to/shim/build
+Use --compile-only to compile without opening a window or starting Darling.
+--output-dir keeps the binary and nonsecret evidence; prefixes stay in /tmp.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "launcher"))
+from macoblox import display, graphics
+
+
+def run_case(binary, build, output, negative):
+    name = "failed-init-retry" if negative else "render"
+    prefix = Path(tempfile.mkdtemp(prefix="macoblox-wayland-fixture-")) / "prefix"
+    for relative in ("var/run", "var/db", "var/log", "var/tmp/launchd", "private/var/run",
+                     "private/var/log", "private/tmp", "private/etc"):
+        (prefix / relative).mkdir(parents=True, exist_ok=True)
+    base = {key: value for key, value in os.environ.items() if key not in
+            ("DPREFIX", "DISPLAY", "DYLD_INSERT_LIBRARIES", "DYLD_FORCE_FLAT_NAMESPACE", "MACOBLOX_WEB_SOCKET")}
+    overrides = {}
+    if negative:
+        invalid = prefix.parent / "invalid_icd.json"
+        invalid.write_text(json.dumps({"file_format_version": "1.0.1", "ICD": {
+            "library_path": str(prefix.parent / "missing-driver.so"), "api_version": "1.3.0"}}))
+        overrides["VK_DRIVER_FILES"] = str(invalid)
+    with patch.dict(os.environ, overrides):
+        values = graphics.renderer_environment("vulkan")
+        values.update(display.window_environment({"renderer": "vulkan", "display_backend": "wayland"},
+                                                 build / "libmacoblox-wayland.so"))
+    values.update({"MACOBLOX_TRACE_WAYLAND": "1", "DYLD_FORCE_FLAT_NAMESPACE": "1",
+                   "DYLD_INSERT_LIBRARIES": "/Volumes/SystemRoot" + str(build / "libMacOBloxShims.dylib"),
+                   "MESA_SHADER_CACHE_DIR": str(output / "mesa-cache"),
+                   "__GL_SHADER_DISK_CACHE_PATH": str(output / "nvidia-cache")})
+    # LD_PRELOAD may contain Darling's required no-root helper. Keep it on
+    # the darling launcher; do not forward it to the native fixture itself.
+    environment = {**base, **values, "DPREFIX": str(prefix)}
+    arguments = ["/Volumes/SystemRoot" + str(binary)]
+    if negative:
+        arguments.append("--expect-init-failure")
+    command = ["darling", "shell", "/bin/bash", "-c",
+               'unset DISPLAY MACOBLOX_WEB_SOCKET LD_PRELOAD; exec /usr/bin/env "$@"',
+               "wayland-fixture", *[f"{key}={value}" for key, value in values.items()], *arguments]
+    log_path = output / f"{name}.log"
+    evidence = {"prefix": str(prefix), "no_auth": True, "display_unset": True,
+                "negative_control": negative, "generated_icd": values.get("VK_ADD_DRIVER_FILES")}
+    try:
+        with log_path.open("w") as log:
+            result = subprocess.run(command, env=environment, stdout=log, stderr=subprocess.STDOUT, timeout=45)
+        evidence["returncode"] = result.returncode
+    except (OSError, subprocess.TimeoutExpired) as error:
+        evidence["error"] = str(error)
+    finally:
+        try:
+            result = subprocess.run(["darling", "shutdown"], env={**base, "DPREFIX": str(prefix)},
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=15)
+            evidence["scoped_shutdown_returncode"] = result.returncode
+        except (OSError, subprocess.TimeoutExpired) as error:
+            evidence["shutdown_error"] = str(error)
+    text = log_path.read_text(errors="replace") if log_path.is_file() else ""
+    expected = "RETRY_PASS failures=2" if negative else "PASS: Native Wayland AppKit"
+    evidence["passed"] = (evidence.get("returncode") == 0 and expected in text and
+                          evidence.get("scoped_shutdown_returncode") == 0)
+    (output / f"{name}.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print(json.dumps(evidence))
+    for line in text.splitlines():
+        if any(token in line for token in ("_RENDERER", "INIT_FAILURE", "RETRY_", "IDENTITY_", "PUMP_", "PASS:", "FAIL:")):
+            print(line)
+    return evidence["passed"]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", type=Path, required=True)
+    parser.add_argument("--sysroot", type=Path, default=Path(os.environ.get("DARLING_SYSROOT", "/usr/libexec/darling")))
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--compile-only", action="store_true")
+    args = parser.parse_args()
+    build = args.build_dir.resolve()
+    for name in ("libMacOBloxShims.dylib", "libmacoblox-wayland.so"):
+        if not (build / name).is_file():
+            parser.error(f"Missing build artifact: {build / name}")
+    output = (args.output_dir or Path(tempfile.mkdtemp(prefix="macoblox-wayland-evidence-"))).resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    binary = output / "darling-wayland-render-test"
+    result = subprocess.run(["clang", "-target", "x86_64-apple-darwin", "-fuse-ld=lld",
+                             "-isysroot", str(args.sysroot), "-mmacosx-version-min=11.0", "-fobjc-exceptions",
+                             "-Wall", "-Wextra", str(ROOT / "tests/darling_wayland_render_test.m"),
+                             "-framework", "AppKit", "-framework", "Foundation", "-framework", "OpenGL",
+                             "-framework", "CoreGraphics", "-o", str(binary)], timeout=30)
+    if result.returncode:
+        return result.returncode
+    if args.compile_only:
+        print(json.dumps({"compile_only": True, "binary": str(binary)}))
+        return 0
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        parser.error("This fixture requires a running native Wayland desktop session")
+    os.environ["XDG_CACHE_HOME"] = str(output / "driver-cache")
+    positive = run_case(binary, build, output, False)
+    negative = run_case(binary, build, output, True)
+    return 0 if positive and negative else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
