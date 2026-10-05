@@ -30,7 +30,7 @@ fn nz(v: u32) -> NonZeroU32 {
 #[cfg(target_os = "linux")]
 fn with_app_id(attrs: WindowAttributes) -> WindowAttributes {
     use winit::platform::wayland::WindowAttributesExtWayland;
-    attrs.with_name("org.macncheese.MacNCheese", "macncheese")
+    attrs.with_name("com.nenquen.Macncheese", "macncheese")
 }
 
 #[cfg(not(target_os = "linux"))]

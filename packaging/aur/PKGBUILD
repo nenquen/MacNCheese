@@ -36,8 +36,8 @@ package() {
     install -Dm644 "branding/icons/macncheese-$size.png" \
       "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/macncheese.png"
   done
-  install -Dm644 packaging/org.macncheese.MacNCheese.desktop -t "$pkgdir/usr/share/applications"
-  install -Dm644 packaging/org.macncheese.MacNCheese.URI.desktop -t "$pkgdir/usr/share/applications"
+  install -Dm644 packaging/com.nenquen.Macncheese.desktop -t "$pkgdir/usr/share/applications"
+  install -Dm644 packaging/com.nenquen.Macncheese.URI.desktop -t "$pkgdir/usr/share/applications"
   install -Dm644 packaging/macncheese-roblox-window.desktop -t "$pkgdir/usr/share/applications"
   install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

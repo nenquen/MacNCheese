@@ -16,7 +16,7 @@
 
 - Independent codebase under `nenquen/MacNCheese`: all identifiers, paths,
   environment variables (`MACNCHEESE_*`), the shim library
-  (`libMacNCheeseShims.dylib`) and the app ID (`org.macncheese.MacNCheese`)
+  (`libMacNCheeseShims.dylib`) and the app ID (`com.nenquen.Macncheese`)
   renamed from MacOBlox. Installers clean up MacOBlox leftovers and migrate
   `aubree-lat/MacOBlox` git remotes.
 - Shim sources moved into `shim/`; AUR and Flatpak packaging updated.

@@ -1,12 +1,12 @@
 //! Desktop integration: menu entry + icons so Wayland/X11 show the
 //! cheese logo instead of a generic icon. Matches app_id
-//! org.macncheese.MacNCheese set on the winit window.
+//! com.nenquen.Macncheese set on the winit window.
 
 use std::path::PathBuf;
 
 use crate::paths;
 
-const APP_ID: &str = "org.macncheese.MacNCheese";
+const APP_ID: &str = "com.nenquen.Macncheese";
 
 fn data_home() -> PathBuf {
     match std::env::var("XDG_DATA_HOME") {
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn desktop_entry_matches_wayland_app_id() {
         let text = desktop_file("/usr/bin/macncheese");
-        assert!(text.contains("StartupWMClass=org.macncheese.MacNCheese"));
+        assert!(text.contains("StartupWMClass=com.nenquen.Macncheese"));
         assert!(text.contains("Terminal=false"));
         assert!(text.contains("Exec=/usr/bin/macncheese %u"));
         assert!(text.contains("Icon=macncheese"));

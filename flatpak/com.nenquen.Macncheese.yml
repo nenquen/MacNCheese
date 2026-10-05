@@ -1,4 +1,4 @@
-app-id: org.macncheese.MacNCheese
+app-id: com.nenquen.Macncheese
 runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
@@ -8,7 +8,8 @@ command: macncheese
 finish-args:
   - --share=network
   - --share=ipc
-  # Default X11/Xwayland and experimental native Wayland; the launcher is GTK.
+  # Default X11/Xwayland and experimental native Wayland; the TUI opens
+  # its own window, the terminal fallback needs no display.
   - --socket=x11
   - --socket=wayland
   - --socket=pulseaudio
@@ -44,22 +45,23 @@ modules:
       - install -d /app/share/macncheese
       - cp -r branding shim frameworks build_debug_shim.sh native /app/share/macncheese/
       - cd /app/share/macncheese/native && cargo build --release --offline || cargo build --release
-      - install -Dm755 /app/share/macncheese/native/target/release/macncheese /app/bin/macncheese
+      - install -Dm755 /app/share/macncheese/native/target/release/macncheese /app/lib/macncheese/macncheese
+      - install -Dm755 flatpak/macncheese.sh /app/bin/macncheese
       - for size in 16 22 24 32 48 64 128 256 512; do install -Dm644 branding/icons/macncheese-$size.png
-        /app/share/icons/hicolor/${size}x${size}/apps/org.macncheese.MacNCheese.png; done
+        /app/share/icons/hicolor/${size}x${size}/apps/com.nenquen.Macncheese.png; done
       # Also as "macncheese", the name the launcher gives its windows (only
       # app-ID icons are exported to the host; this one stays inside).
       - for size in 16 22 24 32 48 64 128 256 512; do install -Dm644 branding/icons/macncheese-$size.png
         /app/share/icons/hicolor/${size}x${size}/apps/macncheese.png; done
       - install -d /app/share/applications
-      - sed 's/^Icon=.*/Icon=org.macncheese.MacNCheese/' packaging/org.macncheese.MacNCheese.desktop
-        > /app/share/applications/org.macncheese.MacNCheese.desktop
-      - sed 's/^Icon=.*/Icon=org.macncheese.MacNCheese/' packaging/org.macncheese.MacNCheese.URI.desktop
-        > /app/share/applications/org.macncheese.MacNCheese.URI.desktop
+      - sed 's/^Icon=.*/Icon=com.nenquen.Macncheese/' packaging/com.nenquen.Macncheese.desktop
+        > /app/share/applications/com.nenquen.Macncheese.desktop
+      - sed 's/^Icon=.*/Icon=com.nenquen.Macncheese/' packaging/com.nenquen.Macncheese.URI.desktop
+        > /app/share/applications/com.nenquen.Macncheese.URI.desktop
       # The Roblox window's own entry, so docks show its icon.
-      - sed 's/^Icon=.*/Icon=org.macncheese.MacNCheese/' packaging/macncheese-roblox-window.desktop
-        > /app/share/applications/org.macncheese.MacNCheese.RobloxWindow.desktop
-      - install -Dm644 flatpak/org.macncheese.MacNCheese.metainfo.xml -t /app/share/metainfo
+      - sed 's/^Icon=.*/Icon=com.nenquen.Macncheese/' packaging/macncheese-roblox-window.desktop
+        > /app/share/applications/com.nenquen.Macncheese.RobloxWindow.desktop
+      - install -Dm644 flatpak/com.nenquen.Macncheese.metainfo.xml -t /app/share/metainfo
     sources:
       - type: dir
         path: ..

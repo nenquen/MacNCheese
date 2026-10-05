@@ -22,7 +22,7 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
 PREFIX=${DPREFIX:-$HOME/.darling}
 # Darling's Debian packages, pinned to the release the Flatpak uses
-# (flatpak/org.macncheese.MacNCheese.yml; change both together). The checksum makes
+# (flatpak/com.nenquen.Macncheese.yml; change both together). The checksum makes
 # sure the download is that release, and a new Darling release cannot break
 # installs before the shim was tested with it.
 DARLING_TAG=v0.1.20260608
@@ -522,11 +522,11 @@ do_install() {
   install -m755 "$DIR/native/target/release/macncheese" "$HOME/.local/bin/macncheese"
   mkdir -p -- "$DATA_HOME/applications"
   sed "s|^Exec=.*|Exec=macncheese|; s|^Icon=.*|Icon=macncheese|" \
-    "$DIR/packaging/org.macncheese.MacNCheese.desktop" \
-    > "$DATA_HOME/applications/org.macncheese.MacNCheese.desktop"
+    "$DIR/packaging/com.nenquen.Macncheese.desktop" \
+    > "$DATA_HOME/applications/com.nenquen.Macncheese.desktop"
   sed "s|^Exec=.*|Exec=macncheese %u|; s|^Icon=.*|Icon=macncheese|" \
-    "$DIR/packaging/org.macncheese.MacNCheese.URI.desktop" \
-    > "$DATA_HOME/applications/org.macncheese.MacNCheese.URI.desktop"
+    "$DIR/packaging/com.nenquen.Macncheese.URI.desktop" \
+    > "$DATA_HOME/applications/com.nenquen.Macncheese.URI.desktop"
   for size in 16 22 24 32 48 64 128 256 512; do
     install -Dm644 "$DIR/branding/icons/macncheese-$size.png" \
       "$DATA_HOME/icons/hicolor/${size}x${size}/apps/macncheese.png"
@@ -534,7 +534,7 @@ do_install() {
   install -Dm644 "$DIR/packaging/macncheese-roblox-window.desktop" \
     "$DATA_HOME/applications/macncheese-roblox-window.desktop"
   # Leftover Python launcher entries.
-  rm -f -- "$DATA_HOME/applications/org.macncheese.MacNCheese.Studio.desktop"
+  rm -f -- "$DATA_HOME/applications/com.nenquen.Macncheese.Studio.desktop"
   local old_link=$HOME/.local/bin/macncheese
   if [[ -L $old_link && $(readlink "$old_link") == */macncheese-launcher ]]; then
     rm -f -- "$old_link"
@@ -569,15 +569,16 @@ do_uninstall() {
   fi
   say "Removing the app menu entries, icons and the macncheese command"
   local apps=$DATA_HOME/applications
-  # The xyz.narez.* names are the app ID before 0.15, wtf.aubree.* before the MacNCheese rebrand.
-  rm -f -- "$apps/org.macncheese.MacNCheese.desktop" "$apps/org.macncheese.MacNCheese.URI.desktop" \
+  # The xyz.narez.* names are the app ID before 0.15, wtf.aubree.* before the MacNCheese rebrand,
+  # org.macncheese.* before the Flatpak ID com.nenquen.Macncheese.
+  rm -f -- "$apps/com.nenquen.Macncheese.desktop" "$apps/com.nenquen.Macncheese.URI.desktop" \
+    "$apps/org.macncheese.MacNCheese.desktop" "$apps/org.macncheese.MacNCheese.URI.desktop" \
     "$apps/wtf.aubree.MacOBlox.desktop" "$apps/wtf.aubree.MacOBlox.URI.desktop" \
     "$apps/wtf.aubree.MacOBlox.Studio.desktop" \
     "$apps/xyz.narez.MacOBlox.desktop" "$apps/xyz.narez.MacOBlox.Studio.desktop" \
     "$apps/macncheese-roblox-window.desktop" "$apps/macoblox-roblox-window.desktop" \
     "$apps/org.macoblox.Launcher.desktop" \
     "$DATA_HOME"/icons/hicolor/*/apps/macncheese.png "$DATA_HOME"/icons/hicolor/*/apps/macoblox.png \
-    "$DATA_HOME/mime/packages/org.macncheese.MacNCheese.xml" \
     "$DATA_HOME/mime/packages/wtf.aubree.MacOBlox.xml" \
     "$DATA_HOME/mime/packages/xyz.narez.MacOBlox.xml"
   local link=$HOME/.local/bin/macncheese
@@ -593,7 +594,8 @@ do_uninstall() {
     rm -f -- "$old_link"
   fi
   if [[ -f $CONFIG_HOME/mimeapps.list ]]; then
-    sed -i       -e 's/org\.macncheese\.MacNCheese\.URI\.desktop;\{0,1\}//g' \
+    sed -i       -e 's/com\.nenquen\.Macncheese\.URI\.desktop;\{0,1\}//g' \
+      -e 's/org\.macncheese\.MacNCheese\.URI\.desktop;\{0,1\}//g' \
       -e 's/wtf\.aubree\.MacOBlox\.Studio\.desktop;\{0,1\}//g' \
       -e 's/wtf\.aubree\.MacOBlox\.URI\.desktop;\{0,1\}//g' \
       -e 's/xyz\.narez\.MacOBlox\.Studio\.desktop;\{0,1\}//g' -e '/^[^=[]*=$/d' "$CONFIG_HOME/mimeapps.list"

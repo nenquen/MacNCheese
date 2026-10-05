@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>org.macncheese.MacNCheese</id>
+  <id>com.nenquen.Macncheese</id>
   <name>Mac'n Cheese</name>
   <summary>Play Roblox on Linux with the macOS client</summary>
   <summary xml:lang="ru">Roblox на Linux через клиент для macOS</summary>
-  <developer id="org.macncheese">
+  <developer id="com.nenquen">
     <name>nenquen</name>
   </developer>
   <replaces>
@@ -28,7 +28,7 @@
     <p>Mac'n Cheese is not affiliated with Roblox Corporation.</p>
     <p xml:lang="ru">Mac'n Cheese не связан с Roblox Corporation.</p>
   </description>
-  <launchable type="desktop-id">org.macncheese.MacNCheese.desktop</launchable>
+  <launchable type="desktop-id">com.nenquen.Macncheese.desktop</launchable>
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/nenquen/MacNCheese/main/flatpak/screenshots/roblox.png</image>
@@ -97,7 +97,7 @@
     </release>
     <release version="0.15" date="2026-09-27">
       <description>
-        <p>Signing in with a password and other embedded pages open in the launcher's own browser window. Microphone for voice chat. New app ID org.macncheese.MacNCheese. Fixes for a Fedora KDE crash loop, for Darling's thread stacks, and for the Flatpak failing with "Cannot determine your user name".</p>
+        <p>Signing in with a password and other embedded pages open in the launcher's own browser window. Microphone for voice chat. New app ID com.nenquen.Macncheese. Fixes for a Fedora KDE crash loop, for Darling's thread stacks, and for the Flatpak failing with "Cannot determine your user name".</p>
       </description>
     </release>
     <release version="0.14" date="2026-09-26">
