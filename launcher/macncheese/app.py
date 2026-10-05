@@ -440,6 +440,7 @@ class PlayPage(Adw.Bin):
 
         status = Adw.StatusPage()
         status.set_icon_name("macncheese")
+        status.set_title("Mac'n Cheese")
         self.status = status
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
@@ -2030,9 +2031,9 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.toasts = Adw.ToastOverlay()
         self.stack = Adw.ViewStack()
         self.play_page = PlayPage(self)
-        self.stack.add_titled_with_icon(self.play_page, "play", _("Play"), "media-playback-start-symbolic")
+        self.stack.add_titled_with_icon(self.play_page, "play", _("Play"), "applications-games-symbolic")
         self.settings_page = SettingsPage(self)
-        self.stack.add_titled_with_icon(self.settings_page, "settings", _("Settings"), "emblem-system-symbolic")
+        self.stack.add_titled_with_icon(self.settings_page, "settings", _("Settings"), "preferences-system-symbolic")
         self.mods_page = ModsPage(self)
         self.stack.add_titled_with_icon(self.mods_page, "mods", _("Mods"), "application-x-addon-symbolic")
         self.info_page = InfoPage(self)
@@ -2050,14 +2051,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.split.set_min_sidebar_width(200)
         self.split.set_max_sidebar_width(260)
         self.split.set_sidebar_width_fraction(0.28)
-        self.split.set_show_sidebar(self.settings.get("show_sidebar", True))
+        self.split.set_show_sidebar(True)
 
         # Sidebar with the page list
         sidebar_toolbar = Adw.ToolbarView()
         sidebar_header = Adw.HeaderBar(show_end_title_buttons=False, show_start_title_buttons=False)
-        sidebar_header.set_title_widget(Gtk.Label(label="Mac'n Cheese", css_classes=["heading"]))
-        sidebar_version = Gtk.Label(label=f"v{__version__}", css_classes=["dim-label", "caption"], margin_end=6)
-        sidebar_header.pack_end(sidebar_version)
         sidebar_toolbar.add_top_bar(sidebar_header)
 
         sidebar_toolbar.set_content(_page_sidebar(self.stack))
@@ -2066,16 +2064,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         # Content area
         content_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
+        header.set_title_widget(Gtk.Label(label=""))
         menu = Gio.Menu()
         menu.append(_("Setup guide"), "win.setup")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                        tooltip_text=_("Launcher menu")))
-
-        sidebar_toggle = Gtk.Button(icon_name="sidebar-show-symbolic")
-        sidebar_toggle.add_css_class("flat")
-        sidebar_toggle.set_tooltip_text(_("Toggle sidebar"))
-        sidebar_toggle.connect("clicked", lambda *_args: self.toggle_sidebar())
-        header.pack_start(sidebar_toggle)
 
         content_view.add_top_bar(header)
         self.toasts.set_child(self.stack)
@@ -2123,11 +2116,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.play_page.refresh()
         if launch:
             self.play_clicked()
-
-    def toggle_sidebar(self):
-        show = not self.split.get_show_sidebar()
-        self.split.set_show_sidebar(show)
-        self.set_setting("show_sidebar", show)
 
     def _check_startup_update(self):
         try:
