@@ -517,10 +517,6 @@ class PlayPage(Adw.Bin):
             _toast(self.window.toasts, _("No log found"))
             return
         self.top_box.set_visible(True)
-        logs_button = self.switcher.get_child_by_name("logs")
-        if logs_button is not None:
-            logs_button.set_sensitive(True)
-            logs_button.set_tooltip_text(_("View game logs"))
         self.logs_view.reset(log_path)
         self.logs_view.update()
         self.stack.set_visible_child_name("logs")
@@ -546,14 +542,6 @@ class PlayPage(Adw.Bin):
 
         # Show switcher when game is active or currently viewing logs
         self.top_box.set_visible(active or viewing_logs)
-
-        logs_button = self.switcher.get_child_by_name("logs")
-        if logs_button is not None:
-            logs_button.set_sensitive(active or bool(self.window.last_log))
-            if not active and not self.window.last_log:
-                logs_button.set_tooltip_text(_("Game is not running"))
-            else:
-                logs_button.set_tooltip_text(_("View game logs"))
 
         if not active and not self.window.last_log and viewing_logs:
             self.stack.set_visible_child_name("play")
