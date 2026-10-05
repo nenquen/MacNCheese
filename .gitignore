@@ -36,3 +36,4 @@ __pycache__/
 /packaging/appimage/bin/
 /packaging/appimage/patchelf*.tar.gz
 packaging/appimage/MacNCheese-*.AppImage
+/native/target/
