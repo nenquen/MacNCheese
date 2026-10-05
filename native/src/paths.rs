@@ -24,12 +24,16 @@ fn xdg(dir_var: &str, fallback: &[&str]) -> PathBuf {
 }
 
 fn writable(dir: &std::path::Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    match std::fs::metadata(dir) {
-        Ok(m) => {
-            let mode = m.permissions().mode();
-            // Rough owner-write check; falls back to trying below.
-            mode & 0o200 != 0
+    // Mode bits lie on read-only mounts (squashfs shows 0755): probe it.
+    let probe = dir.join(".macncheese-write-test");
+    match std::fs::create_dir_all(dir) {
+        Ok(()) => {}
+        Err(_) => return false,
+    }
+    match std::fs::write(&probe, b"1") {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&probe);
+            true
         }
         Err(_) => false,
     }
