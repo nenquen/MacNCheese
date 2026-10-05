@@ -1,6 +1,6 @@
 /* Optional AppKit/Xvfb integration regression. Compile as in
  * darling_cursor_lock_test.m and inject the built shim in a disposable prefix.
- * Run once with MACOBLOX_RAW_MOUSE=0 and once with it enabled. */
+ * Run once with MACNCHEESE_RAW_MOUSE=0 and once with it enabled. */
 extern int printf(const char *, ...);
 extern int fflush(void *);
 extern void *dlsym(void *, const char *);
@@ -197,7 +197,7 @@ int main(void) {
     CHECK(!CGAssociateMouseAndMouseCursorPosition(0));
     [display processPendingEvents]; [queue removeAllObjects];
 
-    char *setting = getenv("MACOBLOX_RAW_MOUSE");
+    char *setting = getenv("MACNCHEESE_RAW_MOUSE");
     raw_mode = !(setting && setting[0] == '0');
     union Event motion = {0};
     motion.motion = (struct Motion){.type=6, .display=connection, .window=xid, .x=160, .y=150,

@@ -2,9 +2,9 @@
 # Optional graphical regression in an isolated prefix and disposable X server.
 set -euo pipefail
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-test_dir=$(mktemp -d /tmp/macoblox-input.XXXXXX)
+test_dir=$(mktemp -d /tmp/macncheese-input.XXXXXX)
 test_prefix="$test_dir/prefix"
-test_build=${MACOBLOX_BUILD_DIR:-$project_dir/build}
+test_build=${MACNCHEESE_BUILD_DIR:-$project_dir/build}
 sysroot=${DARLING_SYSROOT:-/usr/libexec/darling}
 cleanup() {
   DPREFIX="$test_prefix" darling shutdown >/dev/null 2>&1 || true
@@ -14,8 +14,8 @@ cleanup() {
   rm -rf -- "$test_dir" 2>/dev/null || true
 }
 trap cleanup EXIT
-if [[ -n ${MACOBLOX_TEST_TEMPLATE:-} ]]; then
-  python3 - "$MACOBLOX_TEST_TEMPLATE" "$test_prefix" <<'PY'
+if [[ -n ${MACNCHEESE_TEST_TEMPLATE:-} ]]; then
+  python3 - "$MACNCHEESE_TEST_TEMPLATE" "$test_prefix" <<'PY'
 import os, shutil, stat, sys
 def ignore(directory, names):
     return [name for name in names if name in ('.init.pid', '.darlingserver.sock')
@@ -36,11 +36,11 @@ done
 test_display=":$(cat "$test_dir/display")"
 for raw in 0 1; do
   DISPLAY="$test_display" DPREFIX="$test_prefix" timeout 30s darling shell /bin/bash -c '
-    unset WAYLAND_DISPLAY MACOBLOX_WAYLAND_SOCKET
-    export MACOBLOX_WAYLAND=0 MACOBLOX_RAW_MOUSE="$1"
-    export MACOBLOX_MOUSE_SENSITIVITY=1 MACOBLOX_SCROLL_SENSITIVITY=1
+    unset WAYLAND_DISPLAY MACNCHEESE_WAYLAND_SOCKET
+    export MACNCHEESE_WAYLAND=0 MACNCHEESE_RAW_MOUSE="$1"
+    export MACNCHEESE_MOUSE_SENSITIVITY=1 MACNCHEESE_SCROLL_SENSITIVITY=1
     export DYLD_FORCE_FLAT_NAMESPACE=1
-    export DYLD_INSERT_LIBRARIES="/Volumes/SystemRoot$2/libMacOBloxShims.dylib"
+    export DYLD_INSERT_LIBRARIES="/Volumes/SystemRoot$2/libMacNCheeseShims.dylib"
     exec "/Volumes/SystemRoot$3/input-test"
   ' input-test "$raw" "$test_build" "$test_dir" >"$test_dir/input-$raw.log" 2>&1 || {
     cat "$test_dir/input-$raw.log"

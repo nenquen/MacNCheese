@@ -147,7 +147,7 @@ static int resolve(void) {
 
 /* Called before XFixesHideCursor on lock entry, and again on cursor changes.
  * A transparent cursor stays transparent; a game's custom cursor is kept. */
-int macoblox_cursor_overlay_update(int locked, XID game_window, int visible) {
+int macncheese_cursor_overlay_update(int locked, XID game_window, int visible) {
     if (!locked || !game_window) {
         if (display && overlay) {
             p_XUnmapWindow(display, overlay);

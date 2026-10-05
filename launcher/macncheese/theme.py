@@ -1,4 +1,4 @@
-"""The launcher's look: the dark monochrome desktop of aubree.wtf.
+"""The launcher's look: the dark monochrome desktop of nenquen.
 
 Pure black behind a slowly drawn field of grey lines, a thin top bar, and
 square "windows" with a small title bar in mono. No hue anywhere: state is

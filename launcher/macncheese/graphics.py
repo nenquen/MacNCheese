@@ -67,7 +67,7 @@ def _authenticated_install_command(command):
     run0 = _system_program("run0")
     if run0:
         # Default interactive polkit authentication enables the desktop prompt.
-        return [run0, "--description=Install Mac O' Blox Vulkan dependencies", "--", *command], {}
+        return [run0, "--description=Install Mac'n Cheese Vulkan dependencies", "--", *command], {}
     pkexec = _system_program("pkexec")
     if pkexec:
         return [pkexec, *command], {}
@@ -153,7 +153,7 @@ def mangohud_environment(renderer, enabled=False):
         library = next((path for path in libraries if path.is_file()), None)
         if library is None:
             raise RuntimeError("MangoHud's OpenGL library is missing. Install MangoHud or turn it off in Settings.")
-        variables["MACOBLOX_MANGOHUD_OPENGL"] = str(library)
+        variables["MACNCHEESE_MANGOHUD_OPENGL"] = str(library)
     return variables
 
 
@@ -172,7 +172,7 @@ def renderer_environment(renderer):
         "GALLIUM_DRIVER": "zink",
         "__EGL_VENDOR_LIBRARY_FILENAMES": str(manifest),
         "EGL_PLATFORM": "x11",
-        "MACOBLOX_METAL": "0",
+        "MACNCHEESE_METAL": "0",
     }
 
 
@@ -235,7 +235,7 @@ def wayland_vulkan_environment():
         return filters
     payload = json.dumps(manifest, sort_keys=True, indent=2) + "\n"
     digest = hashlib.sha256(payload.encode()).hexdigest()[:16]
-    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "macoblox/vulkan"
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "macncheese/vulkan"
     # Preserve the source basename: Vulkan loader select/disable filters
     # match manifest names, so the extra ICD obeys the same user filters.
     target = (cache / f"nvidia-egl-{digest}" / basename).absolute()
@@ -329,7 +329,7 @@ def _probe():
     query_surface = function(egl, "eglQuerySurface", integer, ptr, ptr, integer, ptr)
     terminate = function(egl, "eglTerminate", integer, ptr)
     wayland_window = None
-    if os.environ.get("MACOBLOX_WAYLAND") == "1":
+    if os.environ.get("MACNCHEESE_WAYLAND") == "1":
         try:
             from .display import WaylandProbeWindow
         except ImportError:  # this file runs directly in the probe subprocess
@@ -453,7 +453,7 @@ def _probe():
                 if shared:
                     destroy_context(display, shared)
 
-        thread = threading.Thread(target=worker, name="MacOBlox EGL probe")
+        thread = threading.Thread(target=worker, name="MacNCheese EGL probe")
         thread.start()
         thread.join()  # the parent subprocess timeout covers driver hangs
         if failures:

@@ -1,4 +1,4 @@
-"""Discord Rich Presence for MacOBlox over Discord IPC Unix sockets."""
+"""Discord Rich Presence for MacNCheese over Discord IPC Unix sockets."""
 
 from __future__ import annotations
 
@@ -14,13 +14,13 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-log = logging.getLogger("macoblox.discord")
+log = logging.getLogger("macncheese.discord")
 
 CLIENT_ID = "1468188794309050523"
 
 CACHE_FILE = (
     Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
-    / "MacOBlox"
+    / "MacNCheese"
     / "game_cache.json"
 )
 
@@ -288,8 +288,8 @@ class DiscordRPC:
         details: str = "Playing Roblox",
         state: str | None = None,
         start_time: float | None = None,
-        large_image: str = "macoblox",
-        large_text: str = "Mac O’ Blox",
+        large_image: str = "macncheese",
+        large_text: str = "Mac'n Cheese",
         small_image: str | None = None,
         small_text: str | None = None,
     ) -> bool:

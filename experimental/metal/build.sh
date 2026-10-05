@@ -3,11 +3,11 @@
 set -euo pipefail
 base=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 project=$(cd -- "$base/../.." && pwd -P)
-cache=${XDG_CACHE_HOME:-$HOME/.cache}/macoblox-vulkan/src
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src
 darling_source=${DARLING_SOURCE:-$cache/darling}
 vulkan_headers=${VULKAN_HEADERS:-$cache/Vulkan-Headers-1.3.290/include}
 sysroot=${DARLING_SYSROOT:-/usr/libexec/darling}
-work=${MACOBLOX_METAL_WORK:-$project/work/metal-backend-repro}
+work=${MACNCHEESE_METAL_WORK:-$project/work/metal-backend-repro}
 compiler=${CXX:-clang++}
 python3 "$base/source_pins.py" --darling "$darling_source" --vulkan "$vulkan_headers"
 metal_source="$darling_source/src/external/metal"
@@ -18,7 +18,7 @@ indium_source="$work/indium"
 # Only this private build copy is changed. Upstream source remains untouched.
 if [[ -e "$indium_source" ]]; then
   printf '%s\n' "Indium build copy already exists: $indium_source" >&2
-  printf '%s\n' 'Use a new MACOBLOX_METAL_WORK directory for a fresh build.' >&2
+  printf '%s\n' 'Use a new MACNCHEESE_METAL_WORK directory for a fresh build.' >&2
   exit 1
 fi
 cp -a "$metal_source/deps/indium" "$indium_source"

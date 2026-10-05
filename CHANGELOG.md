@@ -1,5 +1,17 @@
 # Release notes
 
+## 0.20 — 2026-10-05
+
+### Mac'n Cheese rebrand
+
+- Independent codebase under `nenquen/MacNCheese`: all identifiers, paths,
+  environment variables (`MACNCHEESE_*`), the shim library
+  (`libMacNCheeseShims.dylib`) and the app ID (`org.macncheese.MacNCheese`)
+  renamed from MacOBlox. Installers clean up MacOBlox leftovers and migrate
+  `aubree-lat/MacOBlox` git remotes.
+- Shim sources moved into `shim/`; AUR and Flatpak packaging updated.
+- `docs/NOTES.md` history kept as-is and still uses the old names.
+
 ## 0.19 — 2026-10-04
 
 ### Bug fixes and settings

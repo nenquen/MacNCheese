@@ -1,25 +1,25 @@
 /* Cursor selection mailbox. Callers hold their lock and retain owner while
  * stored. Snapshots carry opaque identity only: the worker uses the window
  * XID and never dereferences or owns the cursor. Creating one does not set it. */
-#ifndef MACOBLOX_CURSOR_SELECTION_H
-#define MACOBLOX_CURSOR_SELECTION_H
+#ifndef MACNCHEESE_CURSOR_SELECTION_H
+#define MACNCHEESE_CURSOR_SELECTION_H
 typedef struct {
     unsigned long window, cursor;
     void *owner;
     int dirty;
-} MacOBloxCursorSelection;
+} MacNCheeseCursorSelection;
 
-static inline int macoblox_cursor_selection_set(MacOBloxCursorSelection *state,
+static inline int macncheese_cursor_selection_set(MacNCheeseCursorSelection *state,
                                                unsigned long window,
                                                unsigned long cursor, void *owner) {
     if (!window || (state->window == window && state->cursor == cursor && state->owner == owner))
         return 0;
-    *state = (MacOBloxCursorSelection){window, cursor, owner, 1};
+    *state = (MacNCheeseCursorSelection){window, cursor, owner, 1};
     return 1;
 }
 
-static inline int macoblox_cursor_selection_take(MacOBloxCursorSelection *state,
-                                                MacOBloxCursorSelection *snapshot) {
+static inline int macncheese_cursor_selection_take(MacNCheeseCursorSelection *state,
+                                                MacNCheeseCursorSelection *snapshot) {
     if (!state->dirty)
         return 0;
     *snapshot = *state;
@@ -35,9 +35,9 @@ typedef struct {
                  unsigned long **, unsigned int *);
     int (*free_data)(void *);
     int (*sync)(void *, int);
-} MacOBloxCursorApplyAPI;
+} MacNCheeseCursorApplyAPI;
 
-static inline int macoblox_cursor_selection_apply(const MacOBloxCursorApplyAPI *api,
+static inline int macncheese_cursor_selection_apply(const MacNCheeseCursorApplyAPI *api,
                                                  void *display, unsigned long window) {
     if (!display || !window || !api->undefine || !api->query ||
         !api->free_data || !api->sync)

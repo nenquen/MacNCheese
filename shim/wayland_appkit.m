@@ -127,7 +127,7 @@ extern unsigned long CGBitmapContextGetBytesPerRow(void *);
 @end
 @interface NSPasteboard:NSObject @end
 
-static const struct macoblox_wayland_api *api;
+static const struct macncheese_wayland_api *api;
 static BOOL initialized;
 static NSMutableArray *windows;
 static unsigned modifiers;
@@ -135,10 +135,10 @@ static NSPoint pointer;
 static volatile unsigned captured;
 static BOOL capture_requested;
 
-int macoblox_wayland_enabled(void) {
-    const char *value=getenv("MACOBLOX_WAYLAND");return value && !strcmp(value,"1");
+int macncheese_wayland_enabled(void) {
+    const char *value=getenv("MACNCHEESE_WAYLAND");return value && !strcmp(value,"1");
 }
-int macoblox_wayland_captured(void){return __atomic_load_n(&captured,__ATOMIC_ACQUIRE)!=0;}
+int macncheese_wayland_captured(void){return __atomic_load_n(&captured,__ATOMIC_ACQUIRE)!=0;}
 static void validate_egl(void *native) {
     void *display=eglGetDisplay(native),*config=0;
     int major=0,minor=0,count=0;
@@ -150,20 +150,20 @@ static void validate_egl(void *native) {
     else if(!eglChooseConfig(display,attributes,&config,1,&count) || count<1 || !config)stage="window configuration";
     if(stage) {
         int error=eglGetError();
-        if(getenv("MACOBLOX_TRACE_WAYLAND")) {
+        if(getenv("MACNCHEESE_TRACE_WAYLAND")) {
             const char *platform=getenv("EGL_PLATFORM"),*driver=getenv("MESA_LOADER_DRIVER_OVERRIDE");
             char line[320];
-            int length=snprintf(line,sizeof line,"[MacOBlox Wayland] EGL %s failed: error 0x%x, native %p, display %p, platform %s, driver %s\n",
+            int length=snprintf(line,sizeof line,"[MacNCheese Wayland] EGL %s failed: error 0x%x, native %p, display %p, platform %s, driver %s\n",
                 stage,error,native,display,platform?platform:"auto",driver?driver:"auto");
             if(length>0)write(2,line,(unsigned long)length<sizeof line?(unsigned long)length:sizeof line-1);
         }
         [NSException raise:@"NSWindowServerCommunicationException" format:@"Native Wayland EGL %s failed (0x%x). Select X11 / Xwayland until this graphics driver is supported.",stage,error];
     }
-    if(getenv("MACOBLOX_TRACE_WAYLAND")) {
+    if(getenv("MACNCHEESE_TRACE_WAYLAND")) {
         const char *vendor=eglQueryString(display,0x3053),*version=eglQueryString(display,0x3054);
         const char *platform=getenv("EGL_PLATFORM"),*driver=getenv("MESA_LOADER_DRIVER_OVERRIDE");
         char line[512];
-        int length=snprintf(line,sizeof line,"[MacOBlox Wayland] EGL initialized: native %p, display %p, version %d.%d (%s), vendor %s, platform %s, driver %s\n",
+        int length=snprintf(line,sizeof line,"[MacNCheese Wayland] EGL initialized: native %p, display %p, version %d.%d (%s), vendor %s, platform %s, driver %s\n",
             native,display,major,minor,version?version:"unknown",vendor?vendor:"unknown",platform?platform:"auto",driver?driver:"auto");
         if(length>0)write(2,line,(unsigned long)length<sizeof line?(unsigned long)length:sizeof line-1);
     }
@@ -172,13 +172,13 @@ static void initialize(void) {
     if(initialized)return;
     struct elf_head {void *(*open)(const char *,int);int (*close)(void *);void *(*symbol)(void *,const char *);};
     struct elf_head **elf=dlsym((void *)-2,"_elfcalls");
-    const char *path=getenv("MACOBLOX_WAYLAND_HELPER");
+    const char *path=getenv("MACNCHEESE_WAYLAND_HELPER");
     void *library=path && elf && *elf?(*elf)->open(path,2):0;
-    const struct macoblox_wayland_api *(*get)(void)=library?(*elf)->symbol(library,"macoblox_wayland_host_api"):0;
+    const struct macncheese_wayland_api *(*get)(void)=library?(*elf)->symbol(library,"macncheese_wayland_host_api"):0;
     if(!get || !(api=get()))
         [NSException raise:@"NSWindowServerCommunicationException" format:@"Native Wayland initialization failed. Check the Wayland session and SDL2 helper (%s).",path?path:"helper not set"];
-    if(api->version!=MACOBLOX_WAYLAND_ABI)
-        [NSException raise:@"NSWindowServerCommunicationException" format:@"Native Wayland helper is outdated or incompatible (ABI %u; expected %u). Rebuild MacOBlox before using Native Wayland.",api->version,MACOBLOX_WAYLAND_ABI];
+    if(api->version!=MACNCHEESE_WAYLAND_ABI)
+        [NSException raise:@"NSWindowServerCommunicationException" format:@"Native Wayland helper is outdated or incompatible (ABI %u; expected %u). Rebuild MacNCheese before using Native Wayland.",api->version,MACNCHEESE_WAYLAND_ABI];
     /* Darling reports CGL success even when eglInitialize or config selection
      * fails. Check those operations explicitly before caching its display. */
     validate_egl(api->display());
@@ -187,16 +187,16 @@ static void initialize(void) {
     windows=[NSMutableArray new];
     initialized=YES;
 }
-@interface MacOBloxWaylandWindow:CGWindow {
+@interface MacNCheeseWaylandWindow:CGWindow {
 @public NSWindow *owner;NSRect frame;NSUInteger style;unsigned handle,buttons;void *bitmap;BOOL mapped;
 }
 - (id)initWithOwner:(NSWindow *)window;
 @end
-@interface MacOBloxWaylandSubwindow:CGSubWindow {MacOBloxWaylandWindow *parent;unsigned handle;}
-- (id)initWithParent:(MacOBloxWaylandWindow *)window frame:(NSRect)value;
+@interface MacNCheeseWaylandSubwindow:CGSubWindow {MacNCheeseWaylandWindow *parent;unsigned handle;}
+- (id)initWithParent:(MacNCheeseWaylandWindow *)window frame:(NSRect)value;
 - (void)setFrame:(NSRect)value;
 @end
-static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,int *y,int *width,int *height) {
+static BOOL subwindow_frame(MacNCheeseWaylandWindow *parent,NSRect value,int *x,int *y,int *width,int *height) {
     /* AppKit views use bottom-left coordinates. The helper's Wayland surface
      * positions use the top-left of the logical, undecorated client area. */
     double top=parent->frame.size.height-value.origin.y-value.size.height;
@@ -208,8 +208,8 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     *width=value.size.width<1?1:(int)value.size.width;*height=value.size.height<1?1:(int)value.size.height;
     return YES;
 }
-@implementation MacOBloxWaylandSubwindow
-- (id)initWithParent:(MacOBloxWaylandWindow *)window frame:(NSRect)value {
+@implementation MacNCheeseWaylandSubwindow
+- (id)initWithParent:(MacNCheeseWaylandWindow *)window frame:(NSRect)value {
     if(!(self=[super init]))return nil;
     parent=[window retain];int x,y,width,height;
     if(!parent || !parent->handle || !subwindow_frame(parent,value,&x,&y,&width,&height) ||
@@ -227,7 +227,7 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
         api->subwindow_frame(handle,x,y,width,height);
 }
 @end
-@implementation MacOBloxWaylandWindow
+@implementation MacNCheeseWaylandWindow
 - (id)initWithOwner:(NSWindow *)window {
     if(!(self=[super init]))return nil;
     initialize();owner=window;frame=[window frame];frame.origin=(NSPoint){0,0};style=[window styleMask];
@@ -274,7 +274,7 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
 - (void)addEntriesToDeviceDictionary:(id)entries{}
 - (void *)cglContext{return 0;}
 - (NSPoint)mouseLocationOutsideOfEventStream{return (NSPoint){pointer.x,frame.size.height-pointer.y};}
-- (id)createSubWindowWithFrame:(NSRect)value{return [[[MacOBloxWaylandSubwindow alloc] initWithParent:self frame:value] autorelease];}
+- (id)createSubWindowWithFrame:(NSRect)value{return [[[MacNCheeseWaylandSubwindow alloc] initWithParent:self frame:value] autorelease];}
 - (id)cgContext {
     if(!bitmap){const void *color=CGColorSpaceCreateDeviceRGB();bitmap=CGBitmapContextCreate(0,frame.size.width>0?frame.size.width:1,frame.size.height>0?frame.size.height:1,8,0,color,0x2002);CGColorSpaceRelease(color);}
     return (id)bitmap;
@@ -288,10 +288,10 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
 - (void)dealloc{[self invalidate];[super dealloc];}
 @end
 
-@interface MacOBloxWaylandPasteboard:NSPasteboard {NSString *name;NSMutableDictionary *values;NSInteger changes;}
+@interface MacNCheeseWaylandPasteboard:NSPasteboard {NSString *name;NSMutableDictionary *values;NSInteger changes;}
 - (id)initWithName:(NSString *)value;
 @end
-@implementation MacOBloxWaylandPasteboard
+@implementation MacNCheeseWaylandPasteboard
 - (id)initWithName:(NSString *)value{if((self=[super init])){name=[value retain];values=[NSMutableDictionary new];}return self;}
 - (void)dealloc{[name release];[values release];[super dealloc];}
 - (NSString *)name{return name;}
@@ -315,17 +315,17 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     [values setObject:data forKey:type];changes++;return YES;
 }
 @end
-@interface MacOBloxWaylandCursor:NSObject {@public NSImage *image;NSPoint hot;NSString *name;}
+@interface MacNCheeseWaylandCursor:NSObject {@public NSImage *image;NSPoint hot;NSString *name;}
 @end
-@implementation MacOBloxWaylandCursor
+@implementation MacNCheeseWaylandCursor
 - (void)dealloc{[image release];[name release];[super dealloc];}
 @end
-@interface MacOBloxWaylandDisplay:NSDisplay
+@interface MacNCheeseWaylandDisplay:NSDisplay
 - (void)pump:(id)timer;
 - (void)grabMouse:(BOOL)value;
 - (void)warpMouse:(NSPoint)position;
 @end
-@implementation MacOBloxWaylandDisplay
+@implementation MacNCheeseWaylandDisplay
 - (id)init {
     if(!(self=[super init]))return nil;
     /* X11.backend supplies Fontconfig and named colors, without constructing
@@ -334,7 +334,7 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     NSArray *paths=[bundle pathsForResourcesOfType:@"backend" inDirectory:@"Backends"];
     for(NSUInteger i=0;i<[paths count];i++)[[NSBundle bundleWithPath:[paths objectAtIndex:i]] load];
     const char *names[]={"allFontFamilyNames","fontTypefacesForFamilyName:","substituteFamilyName:","colorWithName:"};
-    for(unsigned i=0;i<4;i++){SEL selector=sel_registerName(names[i]);Method method=class_getInstanceMethod(objc_getClass("X11Display"),selector);if(method)class_addMethod([MacOBloxWaylandDisplay class],selector,method_getImplementation(method),method_getTypeEncoding(method));}
+    for(unsigned i=0;i<4;i++){SEL selector=sel_registerName(names[i]);Method method=class_getInstanceMethod(objc_getClass("X11Display"),selector);if(method)class_addMethod([MacNCheeseWaylandDisplay class],selector,method_getImplementation(method),method_getTypeEncoding(method));}
     initialize();
     id timer=[NSTimer timerWithTimeInterval:0.004 target:self selector:@selector(pump:) userInfo:nil repeats:YES];
     id loop=[NSRunLoop currentRunLoop];
@@ -349,7 +349,7 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     [self pump:nil];
     return [super nextEventMatchingMask:mask untilDate:date inMode:mode dequeue:dequeue];
 }
-- (id)newWindowWithDelegate:(id)delegate{return [[MacOBloxWaylandWindow alloc] initWithOwner:delegate];}
+- (id)newWindowWithDelegate:(id)delegate{return [[MacNCheeseWaylandWindow alloc] initWithOwner:delegate];}
 - (NSArray *)screens {
     int w,h;double hz;api->screen(&w,&h,&hz);NSRect rect={{0,0},{w,h}};
     return @[[[[NSScreen alloc] initWithFrame:rect visibleFrame:rect] autorelease]];
@@ -373,15 +373,15 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
 - (void *)keyboardLayout:(unsigned int *)length{if(length)*length=0;return 0;}
 - (id)pasteboardWithName:(NSString *)name {
     static NSMutableDictionary *boards;if(!boards)boards=[NSMutableDictionary new];
-    id board=[boards objectForKey:name];if(!board){board=[[[MacOBloxWaylandPasteboard alloc] initWithName:name] autorelease];[boards setObject:board forKey:name];}return board;
+    id board=[boards objectForKey:name];if(!board){board=[[[MacNCheeseWaylandPasteboard alloc] initWithName:name] autorelease];[boards setObject:board forKey:name];}return board;
 }
 - (void)hideCursor{api->action(0,MW_CURSOR_VISIBLE,0,0,0);}
 - (void)unhideCursor{api->action(0,MW_CURSOR_VISIBLE,1,0,0);}
-- (id)cursorWithName:(NSString *)name{MacOBloxWaylandCursor *cursor=[MacOBloxWaylandCursor new];cursor->name=[name retain];return [cursor autorelease];}
-- (id)cursorWithImage:(NSImage *)image hotSpot:(NSPoint)hot{MacOBloxWaylandCursor *cursor=[MacOBloxWaylandCursor new];cursor->image=[image retain];cursor->hot=hot;return [cursor autorelease];}
-- (void)setCursor:(MacOBloxWaylandCursor *)cursor {
+- (id)cursorWithName:(NSString *)name{MacNCheeseWaylandCursor *cursor=[MacNCheeseWaylandCursor new];cursor->name=[name retain];return [cursor autorelease];}
+- (id)cursorWithImage:(NSImage *)image hotSpot:(NSPoint)hot{MacNCheeseWaylandCursor *cursor=[MacNCheeseWaylandCursor new];cursor->image=[image retain];cursor->hot=hot;return [cursor autorelease];}
+- (void)setCursor:(MacNCheeseWaylandCursor *)cursor {
     if(!cursor)return;
-    static MacOBloxWaylandCursor *applied;
+    static MacNCheeseWaylandCursor *applied;
     if(applied==cursor)return;
     [cursor retain];[applied release];applied=cursor;
     if(!cursor->image){api->cursor(0,0,0,0,0,0,[cursor->name UTF8String]);return;}
@@ -394,7 +394,7 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
 }
 - (void)grabMouse:(BOOL)value {
     capture_requested=value;
-    MacOBloxWaylandWindow *window=(MacOBloxWaylandWindow *)[[[NSApplication sharedApplication] keyWindow] platformWindow];
+    MacNCheeseWaylandWindow *window=(MacNCheeseWaylandWindow *)[[[NSApplication sharedApplication] keyWindow] platformWindow];
     unsigned handle=window?window->handle:0;
     /* Host acknowledgement determines actual capture; preserve intent on blur. */
     if(!value) {
@@ -404,19 +404,19 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     } else if(handle)api->action(handle,MW_LOCK,1,0,0);
 }
 - (void)warpMouse:(NSPoint)position {
-    MacOBloxWaylandWindow *window=(MacOBloxWaylandWindow *)[[[NSApplication sharedApplication] keyWindow] platformWindow];
+    MacNCheeseWaylandWindow *window=(MacNCheeseWaylandWindow *)[[[NSApplication sharedApplication] keyWindow] platformWindow];
     if(!window)return;int w,h;double hz;api->screen(&w,&h,&hz);
     api->action(window->handle,MW_WARP,position.x,position.y-(h-window->frame.size.height),0);
 }
 - (void)pump:(id)timer {
     static BOOL pumping;if(pumping)return;pumping=YES;
     static BOOL traced;
-    if(!traced && getenv("MACOBLOX_TRACE_WAYLAND")){traced=YES;write(2,"[MacOBlox Wayland] AppKit pump active\n",36);}
+    if(!traced && getenv("MACNCHEESE_TRACE_WAYLAND")){traced=YES;write(2,"[MacNCheese Wayland] AppKit pump active\n",36);}
     @try {
-        struct macoblox_wayland_event input;
+        struct macncheese_wayland_event input;
         for(unsigned i=0;i<256 && api->poll(&input);i++) {
-            MacOBloxWaylandWindow *window=nil;
-            for(NSUInteger j=0;j<[windows count];j++){MacOBloxWaylandWindow *candidate=(void *)[(NSNumber *)[windows objectAtIndex:j] longValue];if(candidate->handle==input.window){window=candidate;break;}}
+            MacNCheeseWaylandWindow *window=nil;
+            for(NSUInteger j=0;j<[windows count];j++){MacNCheeseWaylandWindow *candidate=(void *)[(NSNumber *)[windows objectAtIndex:j] longValue];if(candidate->handle==input.window){window=candidate;break;}}
             if(!window || !window->owner)continue;
             NSWindow *owner=window->owner;modifiers=input.modifiers;
             if(input.type==MW_CAPTURE){__atomic_store_n(&captured,input.button?input.window:0,__ATOMIC_RELEASE);continue;}
@@ -449,14 +449,14 @@ static BOOL subwindow_frame(MacOBloxWaylandWindow *parent,NSRect value,int *x,in
     } @finally {pumping=NO;}
 }
 @end
-id macoblox_wayland_display(void){return [[MacOBloxWaylandDisplay alloc] init];}
-int macoblox_wayland_associate(unsigned int connected) {
+id macncheese_wayland_display(void){return [[MacNCheeseWaylandDisplay alloc] init];}
+int macncheese_wayland_associate(unsigned int connected) {
     extern id objc_msgSend(id,SEL,...);
-    MacOBloxWaylandDisplay *display=((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSDisplay"),sel_registerName("currentDisplay"));
+    MacNCheeseWaylandDisplay *display=((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSDisplay"),sel_registerName("currentDisplay"));
     [display grabMouse:!connected];return 0;
 }
-int macoblox_wayland_warp(NSPoint position) {
+int macncheese_wayland_warp(NSPoint position) {
     extern id objc_msgSend(id,SEL,...);
-    MacOBloxWaylandDisplay *display=((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSDisplay"),sel_registerName("currentDisplay"));
+    MacNCheeseWaylandDisplay *display=((id(*)(id,SEL))objc_msgSend)((id)objc_getClass("NSDisplay"),sel_registerName("currentDisplay"));
     [display warpMouse:position];return 0;
 }

@@ -15,9 +15,9 @@ fi
 export EGL_PLATFORM=x11
 # No host player here (the launcher's pw-cat FIFO), and Darling's own audio
 # path crashes the game: no sound, as the launcher does without pw-cat.
-# MACOBLOX_AUDIO_FIFO=... or MACOBLOX_AUDIO=1 overrides this.
-if [[ -z ${MACOBLOX_AUDIO_FIFO:-} ]]; then
-  export MACOBLOX_AUDIO=${MACOBLOX_AUDIO:-0}
+# MACNCHEESE_AUDIO_FIFO=... or MACNCHEESE_AUDIO=1 overrides this.
+if [[ -z ${MACNCHEESE_AUDIO_FIFO:-} ]]; then
+  export MACNCHEESE_AUDIO=${MACNCHEESE_AUDIO:-0}
 fi
 "$project_dir/build_debug_shim.sh"
 mkdir -p "$project_dir/logs"
@@ -26,12 +26,12 @@ printf 'Log: %s\n' "$log_file"
 # Pass paths as arguments, preserving spaces and non-ASCII names.
 # Use the existing Darling prefix, which contains the framework replacements.
 set +e
-# Forward every MACOBLOX_* variable into the Darling shell as NAME=value
+# Forward every MACNCHEESE_* variable into the Darling shell as NAME=value
 # arguments, so new diagnostic switches need no changes here.
-macoblox_env=()
+macncheese_env=()
 while IFS= read -r name; do
-  macoblox_env+=("$name=${!name}")
-done < <(compgen -e | grep '^MACOBLOX_' || true)
+  macncheese_env+=("$name=${!name}")
+done < <(compgen -e | grep '^MACNCHEESE_' || true)
 darling shell /bin/bash -c '
   project_dir=$1
   env_count=$2
@@ -44,10 +44,10 @@ darling shell /bin/bash -c '
   app_dir="$project_dir/RobloxPlayer.app/Contents/MacOS"
   cd "$app_dir" || exit
   export DYLD_FORCE_FLAT_NAMESPACE=1
-  export DYLD_INSERT_LIBRARIES="$project_dir/build/libMacOBloxShims.dylib"
+  export DYLD_INSERT_LIBRARIES="$project_dir/build/libMacNCheeseShims.dylib"
   export DYLD_LIBRARY_PATH="$project_dir/build:$app_dir"
   exec ./RobloxPlayer "$@"
-' macoblox "/Volumes/SystemRoot$project_dir" "${#macoblox_env[@]}" "${macoblox_env[@]}" "$@" 2>&1 | tee "$log_file"
+' macncheese "/Volumes/SystemRoot$project_dir" "${#macncheese_env[@]}" "${macncheese_env[@]}" "$@" 2>&1 | tee "$log_file"
 launch_status=${PIPESTATUS[0]}
 printf '\nLauncher exit status: %s\n' "$launch_status" | tee -a "$log_file"
 exit "$launch_status"

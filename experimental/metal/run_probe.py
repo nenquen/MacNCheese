@@ -22,7 +22,7 @@ def main():
     options = parser.parse_args()
     work = options.work.resolve()
     prefix = (options.prefix or work / 'prefix').resolve()
-    marker = prefix / '.macoblox-metal-experiment'
+    marker = prefix / '.macncheese-metal-experiment'
     if prefix.exists() and not marker.is_file():
         raise SystemExit('Refusing an existing prefix without the experiment marker; choose a new path.')
     if not prefix.exists():
@@ -48,13 +48,13 @@ def main():
     exports = {'DYLD_LIBRARY_PATH': host_path(work / 'out'),
                'DYLD_FRAMEWORK_PATH': host_path(work / 'out'),
                'DYLD_FORCE_FLAT_NAMESPACE': '1',
-               'MACOBLOX_METAL_SHADER_CACHE': host_path(work / 'shader-cache')}
+               'MACNCHEESE_METAL_SHADER_CACHE': host_path(work / 'shader-cache')}
     command = 'export ' + ' '.join(f'{key}={shlex.quote(value)}' for key, value in exports.items())
     command += '; exec ' + shlex.join(host_path(path) for path in arguments)
     env = dict(os.environ, DPREFIX=str(prefix))
     env.pop('DYLD_INSERT_LIBRARIES', None)
-    if env.get('MACOBLOX_NOROOT_LIB'):
-        env['LD_PRELOAD'] = env['MACOBLOX_NOROOT_LIB']
+    if env.get('MACNCHEESE_NOROOT_LIB'):
+        env['LD_PRELOAD'] = env['MACNCHEESE_NOROOT_LIB']
     log_path = work / 'probe.log'
     result = 1
     try:

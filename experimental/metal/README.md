@@ -63,7 +63,7 @@ Run commands from the repository root. Required tools: Darling's installed runti
 and matching source/SDK, Clang with LLD and Mach-O support, a C++17 host compiler,
 Python 3, patch, Rust 1.87 or newer, LLVM's `llvm-dis`, `spirv-val`, and a Vulkan 1.3
 driver with timeline semaphores. Tests ran on x86_64 Linux. The default source
-locations are the local `macoblox-vulkan/src` cache; override `DARLING_SOURCE`,
+locations are the local `macncheese-vulkan/src` cache; override `DARLING_SOURCE`,
 `DARLING_SYSROOT`, and `VULKAN_HEADERS` if needed.
 
 ```bash
@@ -71,15 +71,15 @@ bash experimental/metal/run_tests.sh
 bash experimental/metal/build.sh
 
 # Build the licensed translator separately, including JSON reflection support.
-translator_source="${XDG_CACHE_HOME:-$HOME/.cache}/macoblox-vulkan/src/metal2vulkan"
+translator_source="${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/metal2vulkan"
 python3 experimental/metal/source_pins.py \
-  --darling "${DARLING_SOURCE:-${XDG_CACHE_HOME:-$HOME/.cache}/macoblox-vulkan/src/darling}" \
-  --vulkan "${VULKAN_HEADERS:-${XDG_CACHE_HOME:-$HOME/.cache}/macoblox-vulkan/src/Vulkan-Headers-1.3.290/include}" \
+  --darling "${DARLING_SOURCE:-${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/darling}" \
+  --vulkan "${VULKAN_HEADERS:-${XDG_CACHE_HOME:-$HOME/.cache}/macncheese-vulkan/src/Vulkan-Headers-1.3.290/include}" \
   --translator "$translator_source"
 cargo build --release --features serde --manifest-path "$translator_source/Cargo.toml" \
   --target-dir "$PWD/work/metal2vulkan-target"
 
-pack="${XDG_DATA_HOME:-$HOME/.local/share}/MacOBlox/RobloxPlayer.app/Contents/Resources/shaders/shaders_metal_osx.pack"
+pack="${XDG_DATA_HOME:-$HOME/.local/share}/MacNCheese/RobloxPlayer.app/Contents/Resources/shaders/shaders_metal_osx.pack"
 python3 experimental/metal/shader_cache.py "$pack" \
   --out work/metal-backend-repro/shader-cache \
   --translator "$PWD/work/metal2vulkan-target/release/metal2vulkan" --index 30 --index 4
@@ -98,7 +98,7 @@ shaders with texture/sampler reflection were translated during investigation;
 full coverage of the pack has not been established.
 
 `build.sh` creates a private Indium copy and refuses to overwrite an existing
-copy. Choose a new `MACOBLOX_METAL_WORK` directory for a fresh rebuild and pass
+copy. Choose a new `MACNCHEESE_METAL_WORK` directory for a fresh rebuild and pass
 that directory to `run_probe.py --work`. `run_probe.py --device` runs the smaller
 device/memory/queue probe. The runner creates its own disposable Darling prefix
 and refuses an existing unmarked prefix. `--baseline` can copy an existing stock

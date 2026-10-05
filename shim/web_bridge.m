@@ -4,7 +4,7 @@
 // Linux Port (runtime/shims/appkit/browser.m and webview.inc), with their
 // permission.
 //
-// The launcher listens on a Unix socket (MACOBLOX_WEB_SOCKET, its host path
+// The launcher listens on a Unix socket (MACNCHEESE_WEB_SOCKET, its host path
 // as the guest sees it) and both sides speak JSON, one object per line: the
 // game sends requests ({"op": ...}), the launcher events and replies
 // ({"event": ...}). WKWebView objects here are stand-ins that forward every
@@ -178,8 +178,8 @@ extern NSApplication *NSApp;
 @end
 @interface NSAnimationContext : NSObject
 @end
-@interface NSObject (MacOBloxWebHost)
-- (unsigned long)windowHandle; - (id)getView; - (void)macobloxCloseHostedView;
+@interface NSObject (MacNCheeseWebHost)
+- (unsigned long)windowHandle; - (id)getView; - (void)macncheeseCloseHostedView;
 - (id)configuration; - (id)userContentController;
 - (void)webView:(id)view didStartProvisionalNavigation:(id)navigation;
 - (void)webView:(id)view didCommitNavigation:(id)navigation;
@@ -226,7 +226,7 @@ static void disconnectBridge(NSString *reason) {
 }
 
 static const char *socketPath(void) {
-    const char *path = getenv("MACOBLOX_WEB_SOCKET");
+    const char *path = getenv("MACNCHEESE_WEB_SOCKET");
     return path && *path ? path : 0;
 }
 
@@ -265,10 +265,10 @@ static void closeHostedView(id self, SEL selector) {
     removeHostedView(self, selector);
 }
 
-@interface MacOBloxWebBridge : NSObject
+@interface MacNCheeseWebBridge : NSObject
 + (void)tick:(id)timer;
 @end
-@implementation MacOBloxWebBridge
+@implementation MacNCheeseWebBridge
 + (void)load {
     if (!socketPath())
         return;
@@ -281,7 +281,7 @@ static void closeHostedView(id self, SEL selector) {
         initializeBridge();
         id timer = [NSTimer timerWithTimeInterval:0.02 target:self selector:@selector(tick:) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
-        write(2, "[MacOBlox Web] Embedded pages open in the launcher's browser window\n", 68);
+        write(2, "[MacNCheese Web] Embedded pages open in the launcher's browser window\n", 68);
     });
 }
 + (void)tick:(id)timer {
@@ -438,8 +438,8 @@ static BOOL deliverClientURL(id value) {
     return YES;
 }
 
-// -[NSWorkspace openURL:], from libMacOBloxShims.m: 1 when handled here.
-int macoblox_web_open_url(id url) {
+// -[NSWorkspace openURL:], from libMacNCheeseShims.m: 1 when handled here.
+int macncheese_web_open_url(id url) {
     NSString *text = [url absoluteString];
     if (deliverClientURL(text))
         return 1;
@@ -451,7 +451,7 @@ int macoblox_web_open_url(id url) {
 
 // ---------------------------------------------------------------- AppKit gaps
 // Methods Roblox's web-view chrome uses that Darling's AppKit lacks.
-@implementation NSButton (MacOBloxWebChrome)
+@implementation NSButton (MacNCheeseWebChrome)
 + (id)buttonWithTitle:(NSString *)title target:(id)target action:(SEL)action {
     NSButton *button = [[[self alloc] initWithFrame:(NSRect){{0, 0}, {100, 28}}] autorelease];
     [button setTitle:title];
@@ -460,7 +460,7 @@ int macoblox_web_open_url(id url) {
     return button;
 }
 @end
-@implementation NSImage (MacOBloxWebChrome)
+@implementation NSImage (MacNCheeseWebChrome)
 + (id)imageWithSize:(NSSize)size flipped:(BOOL)flipped drawingHandler:(BOOL (^)(NSRect))draw {
     NSImage *image = [[[self alloc] initWithSize:size] autorelease];
     [image setFlipped:flipped];
@@ -473,7 +473,7 @@ int macoblox_web_open_url(id url) {
     return image;
 }
 @end
-@implementation NSAnimationContext (MacOBloxWebChrome)
+@implementation NSAnimationContext (MacNCheeseWebChrome)
 + (void)runAnimationGroup:(void (^)(id))changes completionHandler:(void (^)(void))completion {
     // Darling's animator applies properties immediately; still complete.
     id context = [[[self alloc] init] autorelease];
@@ -481,7 +481,7 @@ int macoblox_web_open_url(id url) {
     if (completion) completion();
 }
 @end
-@implementation NSURL (MacOBloxWebChrome)
+@implementation NSURL (MacNCheeseWebChrome)
 + (id)fileURLWithPath:(NSString *)path isDirectory:(BOOL)directory relativeToURL:(NSURL *)base {
     return [(id)CFURLCreateWithFileSystemPathRelativeToBase(0, (id)path, 0 /* POSIX */, directory, base) autorelease];
 }
@@ -540,9 +540,9 @@ static void failRequests(id view, NSString *reason) {
     }
 }
 
-@interface NSButton (MacOBloxWebTint)
+@interface NSButton (MacNCheeseWebTint)
 @end
-@implementation NSButton (MacOBloxWebTint)
+@implementation NSButton (MacNCheeseWebTint)
 // The hosted browser toolbar is drawn by the launcher, which applies its theme.
 - (void)setContentTintColor:(id)color {
     if (color) stateFor(self)[@"contentTintColor"] = color;
@@ -550,7 +550,7 @@ static void failRequests(id view, NSString *reason) {
 }
 - (id)contentTintColor { return stateFor(self)[@"contentTintColor"]; }
 @end
-@implementation NSAnimationContext (MacOBloxWebState)
+@implementation NSAnimationContext (MacNCheeseWebState)
 - (void)setDuration:(double)duration { stateFor(self)[@"duration"] = @(duration); }
 - (double)duration { return [stateFor(self)[@"duration"] doubleValue]; }
 - (void)setTimingFunction:(id)function { if (function) stateFor(self)[@"timing"] = function; }
@@ -566,7 +566,7 @@ static void failRequests(id view, NSString *reason) {
 @interface WKHTTPCookieStore : NSObject @end
 @interface WKUserScript : NSObject @end
 
-@implementation WKWebViewConfiguration (MacOBloxWeb)
+@implementation WKWebViewConfiguration (MacNCheeseWeb)
 - (id)preferences {
     id p = stateFor(self)[@"preferences"];
     if (!p) stateFor(self)[@"preferences"] = p = [[[WKPreferences alloc] init] autorelease];
@@ -582,15 +582,15 @@ static void failRequests(id view, NSString *reason) {
 - (void)setApplicationNameForUserAgent:(id)value { if (value) stateFor(self)[@"agent"] = value; }
 - (id)applicationNameForUserAgent { return stateFor(self)[@"agent"]; }
 @end
-@implementation WKPreferences (MacOBloxWeb)
+@implementation WKPreferences (MacNCheeseWeb)
 - (void)setValue:(id)value forKey:(NSString *)key { if (value) stateFor(self)[key] = value; }
 - (id)valueForKey:(NSString *)key { return stateFor(self)[key]; }
 @end
-@implementation WKWebsiteDataStore (MacOBloxWeb)
+@implementation WKWebsiteDataStore (MacNCheeseWeb)
 + (id)defaultDataStore { static id store; if (!store) store = [self new]; return store; }
 - (id)httpCookieStore { static id store; if (!store) store = [WKHTTPCookieStore new]; return store; }
 @end
-@implementation WKHTTPCookieStore (MacOBloxWeb)
+@implementation WKHTTPCookieStore (MacNCheeseWeb)
 - (void)setCookie:(NSHTTPCookie *)cookie completionHandler:(void (^)(void))completion {
     NSMutableDictionary *c = [NSMutableDictionary dictionaryWithDictionary:@{
         @"name": [cookie name], @"value": [cookie value], @"domain": [cookie domain], @"path": [cookie path],
@@ -624,7 +624,7 @@ static void failRequests(id view, NSString *reason) {
     });
 }
 @end
-@implementation WKUserScript (MacOBloxWeb)
+@implementation WKUserScript (MacNCheeseWeb)
 - (id)initWithSource:(NSString *)source injectionTime:(long)time forMainFrameOnly:(BOOL)main {
     self = [self init];
     if (source) stateFor(self)[@"script"] = source;
@@ -633,7 +633,7 @@ static void failRequests(id view, NSString *reason) {
     return self;
 }
 @end
-@implementation WKUserContentController (MacOBloxWeb)
+@implementation WKUserContentController (MacNCheeseWeb)
 - (void)addScriptMessageHandler:(id)handler name:(NSString *)name {
     NSMutableDictionary *handlers = stateFor(self)[@"handlers"];
     if (!handlers) stateFor(self)[@"handlers"] = handlers = [NSMutableDictionary dictionary];
@@ -647,30 +647,30 @@ static void failRequests(id view, NSString *reason) {
 }
 @end
 
-@interface MacOBloxFrameInfo : NSObject { @public NSURLRequest *_request; }
+@interface MacNCheeseFrameInfo : NSObject { @public NSURLRequest *_request; }
 @end
-@implementation MacOBloxFrameInfo
+@implementation MacNCheeseFrameInfo
 - (id)request { return _request; }
 - (void)dealloc { [_request release]; [super dealloc]; }
 @end
-@interface MacOBloxNavigation : NSObject { @public NSURLRequest *_request; long _type; }
+@interface MacNCheeseNavigation : NSObject { @public NSURLRequest *_request; long _type; }
 @end
-@implementation MacOBloxNavigation
+@implementation MacNCheeseNavigation
 - (NSURLRequest *)request { return _request; }
 - (long)navigationType { return _type; }
 - (id)targetFrame {
     // New-window requests are handled by the launcher; these actions target
     // an existing frame. nil would tell Roblox to open an external browser.
-    MacOBloxFrameInfo *frame = [[[MacOBloxFrameInfo alloc] init] autorelease];
+    MacNCheeseFrameInfo *frame = [[[MacNCheeseFrameInfo alloc] init] autorelease];
     frame->_request = [_request retain];
     return frame;
 }
 - (id)sourceFrame { return nil; }
 - (void)dealloc { [_request release]; [super dealloc]; }
 @end
-@interface MacOBloxScriptMessage : NSObject { @public id _body; NSString *_name; id _webView; }
+@interface MacNCheeseScriptMessage : NSObject { @public id _body; NSString *_name; id _webView; }
 @end
-@implementation MacOBloxScriptMessage
+@implementation MacNCheeseScriptMessage
 - (id)body { return _body; }
 - (id)name { return _name; }
 - (id)webView { return _webView; }
@@ -678,7 +678,7 @@ static void failRequests(id view, NSString *reason) {
 - (void)dealloc { [_body release]; [_name release]; [_webView release]; [super dealloc]; }
 @end
 
-@interface MacOBloxWebView : NSView {
+@interface MacNCheeseWebView : NSView {
   @public
     long _id;
     id _configuration, _navigationDelegate, _UIDelegate;
@@ -688,15 +688,15 @@ static void failRequests(id view, NSString *reason) {
     id _navigation;
 }
 - (id)initWithFrame:(NSRect)frame configuration:(id)configuration;
-- (void)macobloxCloseHostedView;
+- (void)macncheeseCloseHostedView;
 @end
-// Installed by +[MacOBloxWebBridge load], only when the launcher listens:
+// Installed by +[MacNCheeseWebBridge load], only when the launcher listens:
 // without it Roblox keeps Darling's WKWebView.
 static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
     (void)cls; (void)selector; (void)zone;
-    return (id)[MacOBloxWebView alloc];
+    return (id)[MacNCheeseWebView alloc];
 }
-@implementation MacOBloxWebView
+@implementation MacNCheeseWebView
 - (id)initWithFrame:(NSRect)frame {
     return [self initWithFrame:frame configuration:[[[WKWebViewConfiguration alloc] init] autorelease]];
 }
@@ -726,7 +726,7 @@ static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
     NSString *custom = [self customUserAgent];
     if (validUserAgent(custom))
         return custom;
-    const char *base = getenv("MACOBLOX_WEB_USER_AGENT");
+    const char *base = getenv("MACNCHEESE_WEB_USER_AGENT");
     NSString *baseText = [NSString stringWithUTF8String:base ? base : ""];
     NSString *application = [_configuration applicationNameForUserAgent];
     return validUserAgent(application) ? [NSString stringWithFormat:@"%@ %@", baseText, application] : baseText;
@@ -776,7 +776,7 @@ static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
             id currentDelegate = [self navigationDelegate];
             if ([currentDelegate respondsToSelector:@selector(webView:didFailProvisionalNavigation:withError:)])
                 [currentDelegate webView:self didFailProvisionalNavigation:navigation
-                    withError:[NSError errorWithDomain:@"MacOBloxWeb" code:1
+                    withError:[NSError errorWithDomain:@"MacNCheeseWeb" code:1
                         userInfo:@{NSLocalizedDescriptionKey: @"The embedded page could not be sent to the browser."}]];
         });
     }
@@ -794,10 +794,10 @@ static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
     [super viewDidMoveToWindow];
     BOOL attached = [self window] != nil;
     if (_attached && !attached)
-        [self macobloxCloseHostedView];
+        [self macncheeseCloseHostedView];
     _attached = attached;
 }
-- (void)macobloxCloseHostedView {
+- (void)macncheeseCloseHostedView {
     if (views[@(_id)] != self)
         return;
     [self retain];
@@ -810,7 +810,7 @@ static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
 }
 - (void)removeFromSuperview {
     if ([self superview])
-        [self macobloxCloseHostedView];
+        [self macncheeseCloseHostedView];
     [super removeFromSuperview];
 }
 - (void)dealloc {
@@ -827,7 +827,7 @@ static void receiveMessage(NSDictionary *message) {
         if (deliverClientURL(message[@"url"]))
             sendMessage(@{@"op": @"return-to-game"});
         else
-            write(2, "[MacOBlox Web] A launch link from the page could not be delivered\n", 66);
+            write(2, "[MacNCheese Web] A launch link from the page could not be delivered\n", 66);
         return;
     }
     if ([type isEqual:@"reply"]) {
@@ -838,14 +838,14 @@ static void receiveMessage(NSDictionary *message) {
         [callbacks removeObjectForKey:key];
         if (block) {
             NSError *error = message[@"error"]
-                ? [NSError errorWithDomain:@"MacOBloxWeb" code:1 userInfo:@{NSLocalizedDescriptionKey: message[@"error"]}]
+                ? [NSError errorWithDomain:@"MacNCheeseWeb" code:1 userInfo:@{NSLocalizedDescriptionKey: message[@"error"]}]
                 : nil;
             block(message[@"value"], error);
             _Block_release(block);
         }
         return;
     }
-    MacOBloxWebView *view = views[message[@"view"]];
+    MacNCheeseWebView *view = views[message[@"view"]];
     if (!view)
         return;
     id delegate = [view navigationDelegate];
@@ -867,7 +867,7 @@ static void receiveMessage(NSDictionary *message) {
         if (stage == 3 && [delegate respondsToSelector:@selector(webView:didFinishNavigation:)])
             [delegate webView:view didFinishNavigation:view->_navigation];
     } else if ([type isEqual:@"navigation"]) {
-        MacOBloxNavigation *action = [[[MacOBloxNavigation alloc] init] autorelease];
+        MacNCheeseNavigation *action = [[[MacNCheeseNavigation alloc] init] autorelease];
         action->_request = [[NSURLRequest requestWithURL:[NSURL URLWithString:message[@"url"]]] retain];
         action->_type = [message[@"type"] longValue];
         if (action->_type == 5)
@@ -885,7 +885,7 @@ static void receiveMessage(NSDictionary *message) {
         id handler = [[stateFor(controller)[@"handlers"][message[@"name"]] retain] autorelease];
         if (!handler)
             return;
-        MacOBloxScriptMessage *m = [[[MacOBloxScriptMessage alloc] init] autorelease];
+        MacNCheeseScriptMessage *m = [[[MacNCheeseScriptMessage alloc] init] autorelease];
         m->_body = [message[@"body"] retain];
         m->_name = [message[@"name"] copy];
         m->_webView = [view retain];
@@ -897,7 +897,7 @@ static void receiveMessage(NSDictionary *message) {
         view->_loading = NO;
         if ([delegate respondsToSelector:@selector(webView:didFailProvisionalNavigation:withError:)])
             [delegate webView:view didFailProvisionalNavigation:view->_navigation
-                withError:[NSError errorWithDomain:@"MacOBloxWeb" code:1
+                withError:[NSError errorWithDomain:@"MacNCheeseWeb" code:1
                                           userInfo:@{NSLocalizedDescriptionKey: message[@"message"] ?: @"The page could not be loaded."}]];
     }
 }

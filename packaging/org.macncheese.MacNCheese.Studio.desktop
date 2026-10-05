@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Roblox Studio (Mac O’ Blox)
+Name=Roblox Studio (Mac'n Cheese)
 Comment=Roblox Studio through Wine
 Comment[ru]=Roblox Studio через Wine
-Exec=macoblox --studio %u
-Icon=macoblox
+Exec=macncheese --studio %u
+Icon=macncheese
 Terminal=false
 Categories=Development;
 MimeType=x-scheme-handler/roblox-studio;x-scheme-handler/roblox-studio-auth;application/x-roblox-place;

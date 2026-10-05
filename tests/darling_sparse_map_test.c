@@ -5,14 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct macoblox_sparse_map { unsigned long last_index; void **data; unsigned long scan_end; };
-typedef int (*insert_fn)(struct macoblox_sparse_map *, int, void *);
-typedef void (*foreach_fn)(struct macoblox_sparse_map *, void (*)(int, void *, void *), void *);
-int macoblox_sparse_map_insert(struct macoblox_sparse_map *, int, void *);
-int macoblox_sparse_map_insert_asm(struct macoblox_sparse_map *, int, void *);
-void macoblox_sparse_map_foreach(struct macoblox_sparse_map *, void (*)(int, void *, void *), void *);
-void macoblox_sparse_map_foreach_asm(struct macoblox_sparse_map *, void (*)(int, void *, void *), void *);
-struct visit { struct macoblox_sparse_map *map; insert_fn insert; int indexes[32]; void *values[32]; int count, mutate; };
+struct macncheese_sparse_map { unsigned long last_index; void **data; unsigned long scan_end; };
+typedef int (*insert_fn)(struct macncheese_sparse_map *, int, void *);
+typedef void (*foreach_fn)(struct macncheese_sparse_map *, void (*)(int, void *, void *), void *);
+int macncheese_sparse_map_insert(struct macncheese_sparse_map *, int, void *);
+int macncheese_sparse_map_insert_asm(struct macncheese_sparse_map *, int, void *);
+void macncheese_sparse_map_foreach(struct macncheese_sparse_map *, void (*)(int, void *, void *), void *);
+void macncheese_sparse_map_foreach_asm(struct macncheese_sparse_map *, void (*)(int, void *, void *), void *);
+struct visit { struct macncheese_sparse_map *map; insert_fn insert; int indexes[32]; void *values[32]; int count, mutate; };
 static void visit(int index, void *value, void *opaque) {
     struct visit *v = opaque;
     assert(v->count < 32);
@@ -24,7 +24,7 @@ static void visit(int index, void *value, void *opaque) {
 }
 static void run(insert_fn insert, foreach_fn foreach) {
     void *slots[17] = {0};
-    struct macoblox_sparse_map map = {16, slots, 0};
+    struct macncheese_sparse_map map = {16, slots, 0};
     struct visit v = { .map=&map, .insert=insert };
     foreach(&map, visit, &v); assert(v.count == 0);
     assert(insert(&map, -1, (void *)1) == -1 && map.scan_end == 0);
@@ -62,7 +62,7 @@ static void run(insert_fn insert, foreach_fn foreach) {
     foreach(&map, visit, &v); assert(v.count == 1 && v.indexes[0] == 0);
 }
 int main(void) {
-    run(macoblox_sparse_map_insert, macoblox_sparse_map_foreach);
-    run(macoblox_sparse_map_insert_asm, macoblox_sparse_map_foreach_asm);
+    run(macncheese_sparse_map_insert, macncheese_sparse_map_foreach);
+    run(macncheese_sparse_map_insert_asm, macncheese_sparse_map_foreach_asm);
     puts("Darling sparse map C/assembly semantics passed");
 }

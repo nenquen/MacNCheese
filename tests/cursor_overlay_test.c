@@ -25,7 +25,7 @@ int main(void) {
     XDefineCursor(d, game, cursor);
     XWarpPointer(d, None, game, 0, 0, 0, 0, 80, 90);
     XSync(d, False);
-    assert(macoblox_cursor_overlay_update(1, game, 1));
+    assert(macncheese_cursor_overlay_update(1, game, 1));
     XSync(display, False);
     XWindowAttributes attrs;
     assert(XGetWindowAttributes(d, overlay, &attrs));
@@ -40,22 +40,22 @@ int main(void) {
     XFixesHideCursor(d, game);
     XWarpPointer(d, None, game, 0, 0, 0, 0, 150, 150);
     XSync(d, False);
-    assert(macoblox_cursor_overlay_update(1, game, 1));
+    assert(macncheese_cursor_overlay_update(1, game, 1));
     XSync(display, False);
     assert(XGetWindowAttributes(d, overlay, &attrs));
     assert(attrs.map_state == IsViewable && attrs.x == 76 && attrs.y == 86);
-    assert(macoblox_cursor_overlay_update(1, game, 0));
+    assert(macncheese_cursor_overlay_update(1, game, 0));
     XSync(display, False);
     assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsUnmapped);
-    assert(macoblox_cursor_overlay_update(1, game, 1));
+    assert(macncheese_cursor_overlay_update(1, game, 1));
     XSync(display, False);
     assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsViewable);
-    assert(macoblox_cursor_overlay_update(0, game, 1));
+    assert(macncheese_cursor_overlay_update(0, game, 1));
     XSync(display, False);
     assert(XGetWindowAttributes(d, overlay, &attrs) && attrs.map_state == IsUnmapped);
     /* A closed game window must not let Xlib's default handler exit Roblox. */
     XDestroyWindow(d, game); XSync(d, False);
-    macoblox_cursor_overlay_update(0, 0, 1); XSync(display, False);
+    macncheese_cursor_overlay_update(0, 0, 1); XSync(display, False);
     XCloseDisplay(d);
     puts("PASS: visible pixels, frozen hotspot, empty input shape, hide/unhide, unlock, window destruction");
 }

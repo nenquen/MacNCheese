@@ -17,17 +17,17 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "launcher"))
-from macoblox import display, graphics
+from macncheese import display, graphics
 
 
 def run_case(binary, build, output, negative):
     name = "failed-init-retry" if negative else "render"
-    prefix = Path(tempfile.mkdtemp(prefix="macoblox-wayland-fixture-")) / "prefix"
+    prefix = Path(tempfile.mkdtemp(prefix="macncheese-wayland-fixture-")) / "prefix"
     for relative in ("var/run", "var/db", "var/log", "var/tmp/launchd", "private/var/run",
                      "private/var/log", "private/tmp", "private/etc"):
         (prefix / relative).mkdir(parents=True, exist_ok=True)
     base = {key: value for key, value in os.environ.items() if key not in
-            ("DPREFIX", "DISPLAY", "DYLD_INSERT_LIBRARIES", "DYLD_FORCE_FLAT_NAMESPACE", "MACOBLOX_WEB_SOCKET")}
+            ("DPREFIX", "DISPLAY", "DYLD_INSERT_LIBRARIES", "DYLD_FORCE_FLAT_NAMESPACE", "MACNCHEESE_WEB_SOCKET")}
     overrides = {}
     if negative:
         invalid = prefix.parent / "invalid_icd.json"
@@ -37,9 +37,9 @@ def run_case(binary, build, output, negative):
     with patch.dict(os.environ, overrides):
         values = graphics.renderer_environment("vulkan")
         values.update(display.window_environment({"renderer": "vulkan", "display_backend": "wayland"},
-                                                 build / "libmacoblox-wayland.so"))
-    values.update({"MACOBLOX_TRACE_WAYLAND": "1", "DYLD_FORCE_FLAT_NAMESPACE": "1",
-                   "DYLD_INSERT_LIBRARIES": "/Volumes/SystemRoot" + str(build / "libMacOBloxShims.dylib"),
+                                                 build / "libmacncheese-wayland.so"))
+    values.update({"MACNCHEESE_TRACE_WAYLAND": "1", "DYLD_FORCE_FLAT_NAMESPACE": "1",
+                   "DYLD_INSERT_LIBRARIES": "/Volumes/SystemRoot" + str(build / "libMacNCheeseShims.dylib"),
                    "MESA_SHADER_CACHE_DIR": str(output / "mesa-cache"),
                    "__GL_SHADER_DISK_CACHE_PATH": str(output / "nvidia-cache")})
     # LD_PRELOAD may contain Darling's required no-root helper. Keep it on
@@ -49,7 +49,7 @@ def run_case(binary, build, output, negative):
     if negative:
         arguments.append("--expect-init-failure")
     command = ["darling", "shell", "/bin/bash", "-c",
-               'unset DISPLAY MACOBLOX_WEB_SOCKET LD_PRELOAD; exec /usr/bin/env "$@"',
+               'unset DISPLAY MACNCHEESE_WEB_SOCKET LD_PRELOAD; exec /usr/bin/env "$@"',
                "wayland-fixture", *[f"{key}={value}" for key, value in values.items()], *arguments]
     log_path = output / f"{name}.log"
     evidence = {"prefix": str(prefix), "no_auth": True, "display_unset": True,
@@ -87,10 +87,10 @@ def main():
     parser.add_argument("--compile-only", action="store_true")
     args = parser.parse_args()
     build = args.build_dir.resolve()
-    for name in ("libMacOBloxShims.dylib", "libmacoblox-wayland.so"):
+    for name in ("libMacNCheeseShims.dylib", "libmacncheese-wayland.so"):
         if not (build / name).is_file():
             parser.error(f"Missing build artifact: {build / name}")
-    output = (args.output_dir or Path(tempfile.mkdtemp(prefix="macoblox-wayland-evidence-"))).resolve()
+    output = (args.output_dir or Path(tempfile.mkdtemp(prefix="macncheese-wayland-evidence-"))).resolve()
     output.mkdir(parents=True, exist_ok=True)
     binary = output / "darling-wayland-render-test"
     result = subprocess.run(["clang", "-target", "x86_64-apple-darwin", "-fuse-ld=lld",

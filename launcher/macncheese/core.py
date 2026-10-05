@@ -1,4 +1,4 @@
-"""Backend of the Mac O’ Blox launcher: paths, settings, fast flags, Roblox
+"""Backend of the Mac'n Cheese launcher: paths, settings, fast flags, Roblox
 updates and running the macOS client through Darling. No GTK here."""
 
 import hashlib
@@ -28,13 +28,13 @@ PROJECT = Path(__file__).resolve().parents[2]
 # Everything the launcher writes: the project folder for a git checkout, the
 # user's data folder when the sources are installed read-only (a package).
 DATA_DIR = (PROJECT if os.access(PROJECT, os.W_OK) else
-            Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "macoblox")
+            Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "macncheese")
 APP_BUNDLE = DATA_DIR / "RobloxPlayer.app"
 BUILD_DIR = DATA_DIR / "build"
 # A package may ship the shim built already (the Flatpak has no compiler).
-PREBUILT_SHIM = os.environ.get("MACOBLOX_PREBUILT_SHIM")
+PREBUILT_SHIM = os.environ.get("MACNCHEESE_PREBUILT_SHIM")
 SHIM_DIR = Path(PREBUILT_SHIM) if PREBUILT_SHIM else BUILD_DIR
-SHIM = SHIM_DIR / "libMacOBloxShims.dylib"
+SHIM = SHIM_DIR / "libMacNCheeseShims.dylib"
 # Frameworks RobloxPlayer links that Darling lacks; stubs from frameworks/.
 FRAMEWORKS = ["CoreML", "CoreHaptics", "DeviceCheck"]
 FRAMEWORKS_BUILD = SHIM_DIR / "frameworks"
@@ -46,7 +46,7 @@ DARLING_SYSROOT = next((path for path in (Path("/usr/libexec/darling"), Path("/u
 DARLING_PREFIX = Path(os.environ.get("DPREFIX") or Path.home() / ".darling")
 # Rootless Darling (for sandboxes such as Flatpak, see flatpak/darling-noroot.c):
 # this library is preloaded into `darling` only, never into the launcher.
-NOROOT_LIB = os.environ.get("MACOBLOX_NOROOT_LIB")
+NOROOT_LIB = os.environ.get("MACNCHEESE_NOROOT_LIB")
 # Darling's bridges to host libraries that Roblox never uses, relative to the
 # macOS root: when the host lacks the library, they are patched to load nothing.
 NATIVE_LIBS = [f"usr/lib/native/{name}.dylib"
@@ -60,8 +60,8 @@ DOWNLOADS = DATA_DIR / "downloads"
 ICONS = PROJECT / "branding" / "icons"
 FAST_FLAGS = APP_BUNDLE / "Contents" / "MacOS" / "ClientSettings" / "ClientAppSettings.json"
 
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "macoblox"
-CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "macoblox"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "macncheese"
+CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "macncheese"
 # Written by the shim when Roblox starts terminating; see RobloxSession.poll.
 QUIT_SENTINEL = CACHE_DIR / "game-closing"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
@@ -70,8 +70,8 @@ WEB_DATA_DIR = CONFIG_DIR / "web"
 
 DARLING_HOME = DARLING_PREFIX / "Users" / os.environ.get("USER", "user")
 SESSION_FILES = [
-    DARLING_HOME / "Library" / "MacOBlox" / "Cookies.plist",
-    DARLING_HOME / "Library" / "MacOBlox" / "Keychain",
+    DARLING_HOME / "Library" / "MacNCheese" / "Cookies.plist",
+    DARLING_HOME / "Library" / "MacNCheese" / "Keychain",
 ]
 
 VERSION_URL = "https://clientsettingscdn.roblox.com/v2/client-version/MacPlayer"
@@ -121,13 +121,13 @@ DEFAULT_SETTINGS = {
 
 # Settings -> environment variables understood by the shim.
 TRACE_ENV = {
-    "diagnostic_signals": "MACOBLOX_DIAGNOSTIC_SIGNALS",
-    "trace_udp": "MACOBLOX_TRACE_UDP",
-    "trace_lock": "MACOBLOX_TRACE_LOCK",
-    "trace_events": "MACOBLOX_TRACE_EVENTS",
-    "trace_gl": "MACOBLOX_TRACE_GL",
-    "fps_log": "MACOBLOX_FPS_LOG",
-    "trace_keys": "MACOBLOX_TRACE_KEYS",
+    "diagnostic_signals": "MACNCHEESE_DIAGNOSTIC_SIGNALS",
+    "trace_udp": "MACNCHEESE_TRACE_UDP",
+    "trace_lock": "MACNCHEESE_TRACE_LOCK",
+    "trace_events": "MACNCHEESE_TRACE_EVENTS",
+    "trace_gl": "MACNCHEESE_TRACE_GL",
+    "fps_log": "MACNCHEESE_FPS_LOG",
+    "trace_keys": "MACNCHEESE_TRACE_KEYS",
 }
 
 
@@ -230,15 +230,15 @@ def installed_version():
 
 def latest_version():
     """Returns (version, clientVersionUpload) from Roblox's version service."""
-    request = urllib.request.Request(VERSION_URL, headers={"User-Agent": "MacOBlox"})
+    request = urllib.request.Request(VERSION_URL, headers={"User-Agent": "MacNCheese"})
     with urllib.request.urlopen(request, timeout=10) as response:
         data = json.load(response)
     return data["version"], data["clientVersionUpload"]
 
 
-REPO_URL = "https://github.com/aubree-lat/MacOBlox.git"
-RELEASES_URL = "https://github.com/aubree-lat/MacOBlox/releases/latest"
-LAUNCHER_RELEASE_URL = "https://api.github.com/repos/aubree-lat/MacOBlox/releases/latest"
+REPO_URL = "https://github.com/nenquen/MacNCheese.git"
+RELEASES_URL = "https://github.com/nenquen/MacNCheese/releases/latest"
+LAUNCHER_RELEASE_URL = "https://api.github.com/repos/nenquen/MacNCheese/releases/latest"
 # Keep these patterns aligned with install.sh. Hosting files stay on main,
 # while partial app fetches only materialize blobs selected by this checkout.
 LAUNCHER_SPARSE_PATTERNS = """/*
@@ -255,10 +255,10 @@ def parse_version_tuple(ver):
 
 
 def check_launcher_update():
-    """Checks GitHub for a newer release of Mac O’ Blox.
+    """Checks GitHub for a newer release of Mac'n Cheese.
     Returns (has_update, latest_version_string, release_url); raises when
     GitHub cannot be reached, so a failed check is not reported as up to date."""
-    req = urllib.request.Request(LAUNCHER_RELEASE_URL, headers={"User-Agent": "MacOBlox"})
+    req = urllib.request.Request(LAUNCHER_RELEASE_URL, headers={"User-Agent": "MacNCheese"})
     with urllib.request.urlopen(req, timeout=6) as response:
         data = json.loads(response.read().decode())
     tag = str(data.get("tag_name") or "").lstrip("v")
@@ -273,7 +273,7 @@ def _git(*args, input=None):
 
 
 def update_launcher(progress=None):
-    """Updates Mac O’ Blox the way install.sh does: pulls the checkout
+    """Updates Mac'n Cheese the way install.sh does: pulls the checkout
     (fast-forward only, so a failed update never leaves a half merge),
     rebuilds the shim and reinstalls the menu entries. Returns (True,
     message), or (False, release page) when this is not a git checkout
@@ -285,7 +285,8 @@ def update_launcher(progress=None):
     # Checkouts from before the move to this fork still point at the original
     # repository, which does not have its fixes (install.sh does the same).
     origin = _git("remote", "get-url", "origin").stdout.strip()
-    if origin in ("https://github.com/narezy/MacOBlox", "https://github.com/narezy/MacOBlox.git"):
+    if origin in ("https://github.com/narezy/MacOBlox", "https://github.com/narezy/MacOBlox.git",
+                     "https://github.com/aubree-lat/MacOBlox", "https://github.com/aubree-lat/MacOBlox.git"):
         _git("remote", "set-url", "origin", REPO_URL)
     for arguments, patterns in (
         (("config", "remote.origin.promisor", "true"), None),
@@ -313,9 +314,9 @@ def update_launcher(progress=None):
                        capture_output=True)
 
     if progress:
-        progress(1.0, _("Mac O’ Blox updated successfully"))
+        progress(1.0, _("Mac'n Cheese updated successfully"))
     # This process keeps running the code it started with.
-    return True, _("Mac O’ Blox updated. Restart it to use the new version.")
+    return True, _("Mac'n Cheese updated. Restart it to use the new version.")
 
 
 def update_roblox(upload, progress=None):
@@ -325,7 +326,7 @@ def update_roblox(upload, progress=None):
     DOWNLOADS.mkdir(parents=True, exist_ok=True)
     archive = DOWNLOADS / f"{upload}-RobloxPlayer.zip"
     request = urllib.request.Request(DOWNLOAD_URL.format(upload=upload),
-                                     headers={"User-Agent": "MacOBlox"})
+                                     headers={"User-Agent": "MacNCheese"})
     try:
         with urllib.request.urlopen(request, timeout=30) as response, open(archive, "wb") as out:
             total = int(response.headers.get("Content-Length") or 0)
@@ -436,12 +437,12 @@ def apply_throttle_patch():
     try:
         output = run_throttle_patcher()
     except Exception as e:
-        logging.getLogger("macoblox").warning("Startup throttle patch failed: %s", e)
+        logging.getLogger("macncheese").warning("Startup throttle patch failed: %s", e)
         return
     if "(patched at" in output:
-        logging.getLogger("macoblox").info(output)
+        logging.getLogger("macncheese").info(output)
     elif "not found" in output:
-        logging.getLogger("macoblox").warning("Startup throttle patch: %s", output)
+        logging.getLogger("macncheese").warning("Startup throttle patch: %s", output)
     # "already disabled" stays silent.
 
 
@@ -507,11 +508,11 @@ def ensure_raknet_transport():
             from .transport_patches import apply_transport_patch
             status = apply_transport_patch(binary)
             if status.startswith("unsupported"):
-                logging.getLogger("macoblox").warning("RakNet compatibility: %s", status)
+                logging.getLogger("macncheese").warning("RakNet compatibility: %s", status)
             elif status == "patched":
-                logging.getLogger("macoblox").info("Verified RakNet compatibility patches applied")
+                logging.getLogger("macncheese").info("Verified RakNet compatibility patches applied")
     except Exception as e:
-        logging.getLogger("macoblox").warning("Failed to ensure RakNet transport: %s", e)
+        logging.getLogger("macncheese").warning("Failed to ensure RakNet transport: %s", e)
 
 
 def ensure_shader_compatibility():
@@ -523,11 +524,11 @@ def ensure_shader_compatibility():
         from .shader_patches import apply_shader_patch
         status = apply_shader_patch(pack)
         if status.startswith("unsupported"):
-            logging.getLogger("macoblox").warning("GLSL compatibility: %s", status)
+            logging.getLogger("macncheese").warning("GLSL compatibility: %s", status)
         elif status == "patched":
-            logging.getLogger("macoblox").info("Verified HeightmapDebugPS shader compatibility repair applied")
+            logging.getLogger("macncheese").info("Verified HeightmapDebugPS shader compatibility repair applied")
     except Exception as e:
-        logging.getLogger("macoblox").warning("Failed to ensure GLSL compatibility: %s", e)
+        logging.getLogger("macncheese").warning("Failed to ensure GLSL compatibility: %s", e)
 
 
 def delete_roblox():
@@ -1083,7 +1084,7 @@ def build_shim():
         return True, _("The shim comes built with this package")
     stamp = _shim_sources_hash()
     result = subprocess.run([str(BUILD_SCRIPT)], capture_output=True, text=True,
-                            env=dict(os.environ, MACOBLOX_BUILD_DIR=str(BUILD_DIR),
+                            env=dict(os.environ, MACNCHEESE_BUILD_DIR=str(BUILD_DIR),
                                      DARLING_SYSROOT=str(DARLING_SYSROOT)))
     if result.returncode == 0:
         try:
@@ -1186,7 +1187,7 @@ def prepare_prefix(env):
     for relative, path in kqueue_libraries:
         status = darling_patches.install_sparse_map_copy(path, DARLING_PREFIX / relative,
                                                        library=relative.as_posix())
-        logging.getLogger("macoblox").info("Darling kqueue map: %s", status)
+        logging.getLogger("macncheese").info("Darling kqueue map: %s", status)
 
 
 def _patched_kqueue_runtime():
@@ -1211,7 +1212,7 @@ def _patched_kqueue_runtime():
             if status == "already patched" and installed.exists():
                 continue
             if status not in ("patched", "already patched"):
-                logging.getLogger("macoblox").debug("Darling kqueue map: %s", status)
+                logging.getLogger("macncheese").debug("Darling kqueue map: %s", status)
                 continue
             staged = NATIVE_BUILD / relative.name
             staged_status = darling_patches.install_sparse_map_copy(stock, staged,
@@ -1225,7 +1226,7 @@ def _patched_kqueue_runtime():
                 continue
             libraries.append((relative, staged))
         except OSError as error:
-            logging.getLogger("macoblox").warning("Could not stage Darling kqueue repair: %s", error)
+            logging.getLogger("macncheese").warning("Could not stage Darling kqueue repair: %s", error)
     return libraries
 
 
@@ -1356,9 +1357,9 @@ def restart_darling():
 
 
 def icon_argb_file():
-    """Write the logo in _NET_WM_ICON layout for the shim (see MACOBLOX_ICON_ARGB)."""
+    """Write the logo in _NET_WM_ICON layout for the shim (see MACNCHEESE_ICON_ARGB)."""
     target = CACHE_DIR / "icon.argb"
-    sources = [ICONS / f"macoblox-{size}.png" for size in (32, 64, 128)]
+    sources = [ICONS / f"macncheese-{size}.png" for size in (32, 64, 128)]
     if target.exists() and all(target.stat().st_mtime >= s.stat().st_mtime for s in sources if s.exists()):
         return target
     from gi.repository import GdkPixbuf  # only needed here
@@ -1392,13 +1393,13 @@ for kv in "$@"; do export "$kv"; done
 # in the prefix replaced from the host is not always seen by a running
 # Darling. Bash only (3.2), which splits ${var/a/b} at a "/" even inside
 # quotes, so the patterns come from variables.
-case ${MACOBLOX_FRAMERATE_CAP:-} in
+case ${MACNCHEESE_FRAMERATE_CAP:-} in
   '' | *[!0-9]*) ;;
   *)
     cap_file="$HOME/Library/Roblox/GlobalBasicSettings_13.xml"
     if [ -f "$cap_file" ]; then
       content=$(<"$cap_file")
-      wanted="<int name=\"FramerateCap\">$MACOBLOX_FRAMERATE_CAP</int>"
+      wanted="<int name=\"FramerateCap\">$MACNCHEESE_FRAMERATE_CAP</int>"
       pattern='<int name="FramerateCap">-?[0-9]+</int>'
       if [[ $content =~ $pattern ]]; then
         old=${BASH_REMATCH[0]}
@@ -1416,14 +1417,14 @@ cd "$app" || exit 1
 # Nothing may run between these exports and exec: every program started
 # after them would get the shim injected too.
 export DYLD_FORCE_FLAT_NAMESPACE=1
-export DYLD_INSERT_LIBRARIES="$shim_dir/libMacOBloxShims.dylib"
+export DYLD_INSERT_LIBRARIES="$shim_dir/libMacNCheeseShims.dylib"
 export DYLD_LIBRARY_PATH="$shim_dir:$app"
 if [ -n "$launch_uri" ]; then
   # Roblox's native macOS browser handoff is the -protocolString argument.
   # Keep the value as one opaque argument; the client owns the protocol
   # format. The shim logs this argument and suppresses Cocoa reinjection when
   # it is present, so one launch has one URL delivery path.
-  export MACOBLOX_PENDING_URI="$launch_uri"
+  export MACNCHEESE_PENDING_URI="$launch_uri"
   exec ./RobloxPlayer -protocolString "$launch_uri"
 fi
 exec ./RobloxPlayer
@@ -1481,7 +1482,7 @@ class HostAudio:
     keeps the FIFO open read/write for the whole session, so pw-cat never
     sees end of file and the game can reopen it any time."""
 
-    NAME = "Roblox (Mac O’ Blox)"
+    NAME = "Roblox (Mac'n Cheese)"
 
     def __init__(self, fifo, keep, player):
         self.fifo, self.keep, self.player = fifo, keep, player
@@ -1538,13 +1539,13 @@ class HostAudio:
         if pipewire and shutil.which("pw-cat"):
             return ["pw-cat", "--record", "--raw", "--format", "f32", "--rate", str(rate),
                     "--channels", str(channels), "--latency", "20ms", "--media-role", "Communication",
-                    "-P", '{ application.name = "Roblox" application.icon-name = "macoblox" '
-                          f'media.name = "Roblox microphone (Mac O’ Blox)" }}',
+                    "-P", '{ application.name = "Roblox" application.icon-name = "macncheese" '
+                          f"media.name = \"Roblox microphone (Mac'n Cheese)\" }}",
                     str(fifo)]
         if shutil.which("pacat"):
             return ["pacat", "--record", "--raw", "--format=float32le", f"--rate={rate}",
                     f"--channels={channels}", "--latency-msec=20", "--client-name=Roblox",
-                    "--stream-name=Roblox microphone (Mac O’ Blox)", "--property=media.role=phone", str(fifo)]
+                    "--stream-name=Roblox microphone (Mac'n Cheese)", "--property=media.role=phone", str(fifo)]
         return None
 
     @classmethod
@@ -1577,7 +1578,7 @@ class HostAudio:
         if pipewire and shutil.which("pw-cat"):
             return ["pw-cat", "--playback", "--raw", "--format", "f32", "--rate", "44100",
                     "--channels", "2", "--latency", "40ms", "--media-role", "Game",
-                    "-P", '{ application.name = "Roblox" application.icon-name = "macoblox" '
+                    "-P", '{ application.name = "Roblox" application.icon-name = "macncheese" '
                           f'media.name = "{cls.NAME}" }}',
                     str(fifo)]
         if shutil.which("pacat"):
@@ -1654,15 +1655,15 @@ class RobloxSession:
         env.update(graphics.renderer_environment(self.settings.get("renderer", "opengl")))
         env.update(graphics.mangohud_environment(self.settings.get("renderer", "opengl"),
                                                self.settings.get("mangohud", False)))
-        env.update(display.window_environment(self.settings, SHIM_DIR / "libmacoblox-wayland.so"))
-        if env["MACOBLOX_WAYLAND"] == "1":
+        env.update(display.window_environment(self.settings, SHIM_DIR / "libmacncheese-wayland.so"))
+        if env["MACNCHEESE_WAYLAND"] == "1":
             env.pop("DISPLAY", None)
         return env
 
     def shim_variables(self):
         variables = [
-            f"MACOBLOX_MOUSE_SENSITIVITY={self.settings['mouse_sensitivity']:.2f}",
-            f"MACOBLOX_SCROLL_SENSITIVITY={self.settings.get('scroll_sensitivity', 1.5):.2f}",
+            f"MACNCHEESE_MOUSE_SENSITIVITY={self.settings['mouse_sensitivity']:.2f}",
+            f"MACNCHEESE_SCROLL_SENSITIVITY={self.settings.get('scroll_sensitivity', 1.5):.2f}",
             # Mesa is the host's library and sees the host's file system,
             # not the prefix: with HOME=/Users/<name> it could not create
             # its shader cache ("Failed to create /Users for shader cache
@@ -1684,41 +1685,41 @@ class RobloxSession:
         variables.extend(f"{name}={value}" for name, value in
                          graphics.renderer_environment(self.settings.get("renderer", "opengl")).items())
         from . import display
-        variables.append(f"MACOBLOX_DPI_SCALE={display.validated_dpi_scale(self.settings.get('dpi_scale', 1.0)):.3f}")
+        variables.append(f"MACNCHEESE_DPI_SCALE={display.validated_dpi_scale(self.settings.get('dpi_scale', 1.0)):.3f}")
         variables.extend(f"{name}={value}" for name, value in
-                         display.window_environment(self.settings, SHIM_DIR / "libmacoblox-wayland.so").items())
+                         display.window_environment(self.settings, SHIM_DIR / "libmacncheese-wayland.so").items())
         # Host graphics libraries see the guest environment after exec.
         variables.extend(f"{name}={value}" for name, value in
                          graphics.mangohud_environment(self.settings.get("renderer", "opengl"),
                                                        self.settings.get("mangohud", False)).items())
         vram = host_vram_bytes(getattr(self, "renderer_name", None))
         if vram:
-            variables.append(f"MACOBLOX_VRAM_BYTES={vram}")
+            variables.append(f"MACNCHEESE_VRAM_BYTES={vram}")
         if self.settings.get("hide_menu_bar"):
-            variables.append("MACOBLOX_HIDE_MENU_BAR=1")
+            variables.append("MACNCHEESE_HIDE_MENU_BAR=1")
         if not self.settings.get("raw_mouse", True):
-            variables.append("MACOBLOX_RAW_MOUSE=0")
+            variables.append("MACNCHEESE_RAW_MOUSE=0")
         if self.settings.get("framerate_cap", 0) > 0:
-            variables.append(f"MACOBLOX_FRAMERATE_CAP={int(self.settings['framerate_cap'])}")
+            variables.append(f"MACNCHEESE_FRAMERATE_CAP={int(self.settings['framerate_cap'])}")
         if self.web_socket:
-            variables.append(f"MACOBLOX_WEB_SOCKET={self.web_socket}")
+            variables.append(f"MACNCHEESE_WEB_SOCKET={self.web_socket}")
             if self.web_user_agent:
-                variables.append(f"MACOBLOX_WEB_USER_AGENT={self.web_user_agent}")
+                variables.append(f"MACNCHEESE_WEB_USER_AGENT={self.web_user_agent}")
         if self.dns:
-            variables.append(f"MACOBLOX_DNS={self.dns.address}")
+            variables.append(f"MACNCHEESE_DNS={self.dns.address}")
         if self.audio:
-            variables.append(f"MACOBLOX_AUDIO_FIFO=/Volumes/SystemRoot{self.audio.fifo}")
-            variables.append(f"MACOBLOX_AUDIO_INPUT_FIFO=/Volumes/SystemRoot{self.audio.input_fifo}")
+            variables.append(f"MACNCHEESE_AUDIO_FIFO=/Volumes/SystemRoot{self.audio.fifo}")
+            variables.append(f"MACNCHEESE_AUDIO_INPUT_FIFO=/Volumes/SystemRoot{self.audio.input_fifo}")
         else:
             # Darling's own audio path crashes the game (see HostAudio).
-            variables.append("MACOBLOX_AUDIO=0")
+            variables.append("MACNCHEESE_AUDIO=0")
         for key, name in TRACE_ENV.items():
             if self.settings.get(key):
                 variables.append(f"{name}=1")
         # Cocoa URL delivery diagnostics are opt-in and stay outside URI
         # handling. They are copied verbatim into the Darling process so a
         # live run can compare selector order and launch timing.
-        for name in ("MACOBLOX_URI_DELAY_MS", "MACOBLOX_URI_SELECTOR_ORDER"):
+        for name in ("MACNCHEESE_URI_DELAY_MS", "MACNCHEESE_URI_SELECTOR_ORDER"):
             value = os.environ.get(name)
             if value:
                 variables.append(f"{name}={value}")
@@ -1726,10 +1727,10 @@ class RobloxSession:
         # host-side pending file available as a fallback for launches that did
         # not carry the value as an argument (for example a retry after the
         # launcher was already open).
-        variables.append(f"MACOBLOX_PENDING_URI_FILE=/Volumes/SystemRoot{CACHE_DIR / 'pending-uri'}")
-        variables.append(f"MACOBLOX_QUIT_SENTINEL=/Volumes/SystemRoot{QUIT_SENTINEL}")
+        variables.append(f"MACNCHEESE_PENDING_URI_FILE=/Volumes/SystemRoot{CACHE_DIR / 'pending-uri'}")
+        variables.append(f"MACNCHEESE_QUIT_SENTINEL=/Volumes/SystemRoot{QUIT_SENTINEL}")
         try:
-            variables.append(f"MACOBLOX_ICON_ARGB=/Volumes/SystemRoot{icon_argb_file()}")
+            variables.append(f"MACNCHEESE_ICON_ARGB=/Volumes/SystemRoot{icon_argb_file()}")
         except Exception:
             pass
         return variables
@@ -1754,7 +1755,7 @@ class RobloxSession:
             from . import graphics
             graphics.ensure_vulkan_dependencies()
         env = self.environment()
-        if env.get("MACOBLOX_WAYLAND") != "1":
+        if env.get("MACNCHEESE_WAYLAND") != "1":
             ensure_x11(env)
         renderer_name = "OpenGL"
         if self.settings.get("renderer", "opengl") == "vulkan":
@@ -1776,7 +1777,7 @@ class RobloxSession:
             from . import mods
             mods.apply_mods(self.settings)
         except Exception as e:
-            logging.getLogger("macoblox").warning("Failed to apply mods: %s", e)
+            logging.getLogger("macncheese").warning("Failed to apply mods: %s", e)
         apply_throttle_patch()
         ensure_raknet_transport()
         ensure_shader_compatibility()
@@ -1800,7 +1801,7 @@ class RobloxSession:
         cleanup_logs(int(self.settings.get("keep_logs", 30)) - 1)
         self.log_path = LOGS / time.strftime("launch-%Y%m%d-%H%M%S.log")
         with open(self.log_path, "wb") as log:
-            log.write(f"Mac O’ Blox {__version__}\n".encode())
+            log.write(f"Mac'n Cheese {__version__}\n".encode())
             log.write(f"Darling: {darling_version(env)}\n".encode())
             log.write(f"Renderer requested: {renderer_name}\n".encode())
             if leftover:
@@ -1811,7 +1812,7 @@ class RobloxSession:
             if changed:
                 log.write(f"Priority: {changed} Darling processes raised to nice {_nice_target(SERVER_NICE)}\n".encode())
             log.flush()
-            command = ["darling", "shell", "/bin/bash", "-c", LAUNCH_SCRIPT, "macoblox",
+            command = ["darling", "shell", "/bin/bash", "-c", LAUNCH_SCRIPT, "macncheese",
                        f"/Volumes/SystemRoot{DATA_DIR}", f"/Volumes/SystemRoot{SHIM.parent}",
                        self.launch_uri if self.launch_uri is not None else "",
                        *self.shim_variables()]

@@ -342,7 +342,7 @@ static int query_xfixes(void) {
     return write_all_on(x_socket, version, sizeof version) && read_reply_on(x_socket, reply);
 }
 
-int macoblox_raw_xfixes_open(void) {
+int macncheese_raw_xfixes_open(void) {
     if (x_socket >= 0)
         return 1;
     if (!connect_display_on(&x_socket))
@@ -355,7 +355,7 @@ int macoblox_raw_xfixes_open(void) {
     return 1;
 }
 
-int macoblox_raw_xfixes_set_hidden(int hidden) {
+int macncheese_raw_xfixes_set_hidden(int hidden) {
     if (x_socket < 0)
         return 0;
     unsigned char request[8] = {xfixes_opcode, hidden ? 29 /* HideCursor */ : 30 /* ShowCursor */,
@@ -367,7 +367,7 @@ int macoblox_raw_xfixes_set_hidden(int hidden) {
 /* The screen's default visual and, if `window` is not 0, that window's
  * visual (GetWindowAttributes). Opens and closes its own connection.
  * Returns 0 when the X server cannot be reached. */
-int macoblox_raw_x_visuals(unsigned int window, unsigned int *root_visual, unsigned int *window_visual) {
+int macncheese_raw_x_visuals(unsigned int window, unsigned int *root_visual, unsigned int *window_visual) {
     int fd;
     unsigned int root;
     if (!connect_display_on(&fd))

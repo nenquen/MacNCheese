@@ -1,4 +1,4 @@
-/* Same patched Vanta topology and palette as aubree.wtf; decoration only. */
+/* Same patched Vanta topology and palette as nenquen; decoration only. */
 (function () {
   'use strict';
   const element = document.getElementById('wallpaper');

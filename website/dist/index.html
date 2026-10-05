@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#000000">
-  <meta name="description" content="Mac O’ Blox brings the macOS Roblox client to Linux through Darling. Free, open source, and made for your desktop.">
-  <meta property="og:title" content="Mac O’ Blox — Roblox on Linux">
+  <meta name="description" content="Mac'n Cheese brings the macOS Roblox client to Linux through Darling. Free, open source, and made for your desktop.">
+  <meta property="og:title" content="Mac'n Cheese — Roblox on Linux">
   <meta property="og:description" content="The macOS Roblox client, running on your Linux desktop through Darling.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://macoblox.aubree.wtf/">
-  <link rel="canonical" href="https://macoblox.aubree.wtf/">
+  <meta property="og:url" content="https://github.com/nenquen/MacNCheese/">
+  <link rel="canonical" href="https://github.com/nenquen/MacNCheese/">
   <link rel="icon" href="assets/favicon.png" type="image/png">
   <link rel="preload" href="assets/fonts/Archivo.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="style.css">
-  <title>Mac O’ Blox — Roblox on Linux</title>
+  <title>Mac'n Cheese — Roblox on Linux</title>
   <script src="assets/vendor/p5.min.js" defer></script>
   <script src="assets/vendor/vanta.topology.min.js" defer></script>
   <script src="background.js" defer></script>
@@ -25,9 +25,9 @@
 
   <main id="main" class="desktop">
     <section class="window" id="about" aria-labelledby="about-title">
-      <header class="window-bar"><span>about</span><a href="https://github.com/aubree-lat/MacOBlox/releases/latest">latest release</a></header>
+      <header class="window-bar"><span>about</span><a href="https://github.com/nenquen/MacNCheese/releases/latest">latest release</a></header>
       <div class="window-body">
-        <img class="wordmark" src="assets/wordmark.png" width="1200" height="286" alt="Mac O’ Blox">
+        <img class="wordmark" src="assets/wordmark.png" width="1200" height="286" alt="Mac'n Cheese">
         <h1 id="about-title">Roblox on Linux.</h1>
         <p>The macOS Roblox client, running on your Linux desktop through Darling.</p>
         <div class="tags"><span>free &amp; open source</span><span>English / Russian</span></div>
@@ -37,7 +37,7 @@
           <li>fastflags, mods, and more</li>
           <li>roblox studio runs on wine itself</li>
         </ul>
-        <div class="about-actions"><a class="button" href="https://github.com/aubree-lat/MacOBlox">GitHub</a></div>
+        <div class="about-actions"><a class="button" href="https://github.com/nenquen/MacNCheese">GitHub</a></div>
       </div>
     </section>
 
@@ -47,30 +47,30 @@
         <button class="preview-tab" id="tab-roblox" role="tab" aria-selected="true" aria-controls="preview-roblox" tabindex="0" type="button">Roblox</button>
         <button class="preview-tab" id="tab-launcher" role="tab" aria-selected="false" aria-controls="preview-launcher" tabindex="-1" type="button">Launcher</button>
       </div>
-      <div class="preview-image" id="preview-roblox" role="tabpanel" aria-labelledby="tab-roblox" tabindex="0"><img src="assets/roblox.png" width="1920" height="1080" alt="The Roblox home screen running through Mac O’ Blox on Linux" fetchpriority="high"></div>
-      <div class="preview-image" id="preview-launcher" role="tabpanel" aria-labelledby="tab-launcher" tabindex="0" hidden><img src="assets/launcher.png" width="1100" height="740" alt="The Mac O’ Blox launcher with install status and play controls" loading="lazy"></div>
+      <div class="preview-image" id="preview-roblox" role="tabpanel" aria-labelledby="tab-roblox" tabindex="0"><img src="assets/roblox.png" width="1920" height="1080" alt="The Roblox home screen running through Mac'n Cheese on Linux" fetchpriority="high"></div>
+      <div class="preview-image" id="preview-launcher" role="tabpanel" aria-labelledby="tab-launcher" tabindex="0" hidden><img src="assets/launcher.png" width="1100" height="740" alt="The Mac'n Cheese launcher with install status and play controls" loading="lazy"></div>
     </section>
 
     <section class="window" id="install" aria-labelledby="install-title">
-      <header class="window-bar"><h2 id="install-title">install</h2><a href="https://github.com/aubree-lat/MacOBlox#install">guide</a></header>
+      <header class="window-bar"><h2 id="install-title">install</h2><a href="https://github.com/nenquen/MacNCheese#install">guide</a></header>
       <div class="window-body">
         <p>Run this in your terminal. The installer guides you through setup and prepares Roblox.</p>
-        <div class="command-box"><code id="install-command">curl -fsSL https://raw.githubusercontent.com/aubree-lat/MacOBlox/main/install.sh | bash</code></div>
+        <div class="command-box"><code id="install-command">curl -fsSL https://raw.githubusercontent.com/nenquen/MacNCheese/main/install.sh | bash</code></div>
         <div class="install-actions">
           <button class="button" id="copy-command" type="button" aria-label="Copy installation command" hidden>Copy command</button>
-          <a class="button" href="https://github.com/aubree-lat/MacOBlox/releases/download/v0.19/MacOBlox-0.19-x86_64.flatpak">Download Flatpak</a>
+          <a class="button" href="https://github.com/nenquen/MacNCheese/releases/download/v0.19/MacNCheese-0.19-x86_64.flatpak">Download Flatpak</a>
         </div>
         <p class="copy-status" id="copy-status" role="status" aria-live="polite"></p>
         <p class="install-note">Run the installer again to update. Your settings and sign-in stay in place. The Flatpak is a testing build without Studio.</p>
         <div class="small-links">
-          <a href="https://github.com/aubree-lat/MacOBlox/releases/download/v0.19/SHA256SUMS">Flatpak checksum</a>
-          <a href="https://github.com/aubree-lat/MacOBlox/releases">All releases</a>
+          <a href="https://github.com/nenquen/MacNCheese/releases/download/v0.19/SHA256SUMS">Flatpak checksum</a>
+          <a href="https://github.com/nenquen/MacNCheese/releases">All releases</a>
         </div>
       </div>
     </section>
 
     <section class="window" id="help" aria-labelledby="help-title">
-      <header class="window-bar"><h2 id="help-title">help</h2><a href="https://github.com/aubree-lat/MacOBlox/blob/main/CHANGELOG.md">release notes</a></header>
+      <header class="window-bar"><h2 id="help-title">help</h2><a href="https://github.com/nenquen/MacNCheese/blob/main/CHANGELOG.md">release notes</a></header>
       <div class="questions">
         <details>
           <summary>What do I need?<span aria-hidden="true">+</span></summary>
@@ -83,15 +83,15 @@
       </div>
       <div class="help-links">
         <a href="https://discord.gg/jpbsf44tBE">Discord</a>
-        <a href="https://github.com/aubree-lat/MacOBlox/issues">Report a bug</a>
-        <a href="https://github.com/aubree-lat/MacOBlox">Source code</a>
+        <a href="https://github.com/nenquen/MacNCheese/issues">Report a bug</a>
+        <a href="https://github.com/nenquen/MacNCheese">Source code</a>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <p>Created by <a href="https://github.com/narezy">Narezany</a>. Maintained by <a href="https://aubree.wtf">aubree.wtf</a>.</p>
-    <p>Independent of Roblox Corporation. <a href="https://github.com/aubree-lat/MacOBlox/blob/main/LICENSE">MIT licensed.</a></p>
+    <p>Created by <a href="https://github.com/narezy">Narezany</a>. Maintained by <a href="https://github.com/nenquen">nenquen</a>.</p>
+    <p>Independent of Roblox Corporation. <a href="https://github.com/nenquen/MacNCheese/blob/main/LICENSE">MIT licensed.</a></p>
   </footer>
 </body>
 </html>

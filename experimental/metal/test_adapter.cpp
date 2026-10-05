@@ -33,10 +33,10 @@ static std::vector<unsigned char> packet(uint32_t count = 1) {
     return result;
 }
 int main() {
-    char temporary[] = "/tmp/macoblox-metal-adapter-XXXXXX";
+    char temporary[] = "/tmp/macncheese-metal-adapter-XXXXXX";
     const char *directory = mkdtemp(temporary);
     assert(directory);
-    setenv("MACOBLOX_METAL_SHADER_CACHE", directory, 1);
+    setenv("MACNCHEESE_METAL_SHADER_CACHE", directory, 1);
     std::string path = std::string(directory) + "/" + std::string(64, '0') + ".mvk";
     auto save = [&](const std::vector<unsigned char>& data) {
         std::ofstream file(path, std::ios::binary);

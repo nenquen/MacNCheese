@@ -47,7 +47,7 @@ std::unordered_map<unsigned, Subwindow> subwindows;
 unsigned next_subwindow=1;
 std::mutex queue_mutex;
 std::deque<std::function<void()>> commands;
-std::deque<macoblox_wayland_event> events;
+std::deque<macncheese_wayland_event> events;
 std::thread ui;
 std::atomic<bool> stopping{false};
 Uint32 wake_event;
@@ -123,7 +123,7 @@ void initialize_cursor_surfaces() {
 }
 void custom_cursor_surface(const std::vector<unsigned char> &pixels,int width,int height,int hot_x,int hot_y) {
     if(!shm)return;
-    int fd=memfd_create("macoblox-wayland-cursor",MFD_CLOEXEC);
+    int fd=memfd_create("macncheese-wayland-cursor",MFD_CLOEXEC);
     size_t size=pixels.size();if(fd<0)return;
     if(ftruncate(fd,size)<0){close(fd);return;}
     void *mapping=mmap(nullptr,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
@@ -141,7 +141,7 @@ void map_initial_frame(wl_surface *surface,int width,int height) {
      * focus before starting the game renderer, so map one initial SHM frame.
      * Subsequent frames are EGL buffers; no game frames pass through SHM. */
     if(!shm)return;
-    int fd=memfd_create("macoblox-wayland-initial-frame",MFD_CLOEXEC);if(fd<0)return;
+    int fd=memfd_create("macncheese-wayland-initial-frame",MFD_CLOEXEC);if(fd<0)return;
     size_t size=(size_t)width*height*4;if(ftruncate(fd,size)<0){close(fd);return;}
     auto pixels=(unsigned int *)mmap(nullptr,size,PROT_READ|PROT_WRITE,MAP_SHARED,fd,0);
     if(pixels==MAP_FAILED){close(fd);return;}
@@ -210,7 +210,7 @@ unsigned mac_key(SDL_Scancode key) {
     default:return 0xffff;
     }
 }
-void push(macoblox_wayland_event event) {
+void push(macncheese_wayland_event event) {
     std::lock_guard<std::mutex> guard(queue_mutex);
     /* Coalesce only adjacent motions. Button/key/focus transitions retain
      * their ordering, even when the renderer temporarily stalls. */
@@ -224,18 +224,18 @@ void capture(Window &window,unsigned id,bool enabled) {
     if(next){window.anchor_x=window.x;window.anchor_y=window.y;}
     if(SDL_SetRelativeMouseMode(next?SDL_TRUE:SDL_FALSE)<0) {
         next=false;
-        std::fprintf(stderr,"[MacOBlox Wayland] Relative pointer unavailable: %s\n",SDL_GetError());
+        std::fprintf(stderr,"[MacNCheese Wayland] Relative pointer unavailable: %s\n",SDL_GetError());
     }
     window.capture=next;
     update_cursor(window);
-    macoblox_wayland_event event{};event.type=MW_CAPTURE;event.window=id;event.button=next;
+    macncheese_wayland_event event{};event.type=MW_CAPTURE;event.window=id;event.button=next;
     push(event);
 }
 void translate(const SDL_Event &input) {
     auto found=windows.find(input.window.windowID);
     if(found==windows.end())return;
     auto &window=found->second;
-    macoblox_wayland_event event{};event.window=found->first;event.modifiers=modifiers();
+    macncheese_wayland_event event{};event.window=found->first;event.modifiers=modifiers();
     event.x=window.capture?window.anchor_x:window.x;event.y=window.capture?window.anchor_y:window.y;
     switch(input.type) {
     case SDL_MOUSEMOTION:
@@ -271,7 +271,7 @@ void translate(const SDL_Event &input) {
         case SDL_WINDOWEVENT_CLOSE:event.type=MW_CLOSE;break;
         default:return;
         }
-        if(getenv("MACOBLOX_TRACE_WAYLAND"))std::fprintf(stderr,"[MacOBlox Wayland] Window event %u for %u\n",event.type,found->first);
+        if(getenv("MACNCHEESE_TRACE_WAYLAND"))std::fprintf(stderr,"[MacNCheese Wayland] Window event %u for %u\n",event.type,found->first);
         break;
     default:return;
     }
@@ -279,7 +279,7 @@ void translate(const SDL_Event &input) {
 }
 unsigned create_window(int width,int height,bool bootstrap=false) {
     if(width<1 || height<1 || width>16384 || height>16384)return 0;
-    SDL_Window *window=SDL_CreateWindow("Mac O' Blox",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,
+    SDL_Window *window=SDL_CreateWindow("Mac'n Cheese",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,
                                       width,height,SDL_WINDOW_RESIZABLE|(bootstrap?SDL_WINDOW_HIDDEN:0));
     SDL_SysWMinfo info{};SDL_VERSION(&info.version);
     if(!window || !SDL_GetWindowWMInfo(window,&info) || info.subsystem!=SDL_SYSWM_WAYLAND || !info.info.wl.surface) {
@@ -293,7 +293,7 @@ unsigned create_window(int width,int height,bool bootstrap=false) {
     windows.emplace(id,std::move(native_window));
     windows.at(id).wl_surface_handle=info.info.wl.surface;
     if(!bootstrap)map_initial_frame(info.info.wl.surface,width,height);
-    std::fprintf(stderr,"[MacOBlox Wayland] Created window %u (%dx%d)\n",id,width,height);
+    std::fprintf(stderr,"[MacNCheese Wayland] Created window %u (%dx%d)\n",id,width,height);
     return id;
 }
 void *display(){return native_display;}
@@ -426,7 +426,7 @@ void action(unsigned id,int operation,double x,double y,const char *text) {
         }
     });
 }
-int poll(macoblox_wayland_event *event) {
+int poll(macncheese_wayland_event *event) {
     std::lock_guard<std::mutex> guard(queue_mutex);
     if(events.empty())return 0;*event=events.front();events.pop_front();return 1;
 }
@@ -466,7 +466,7 @@ const char *clipboard(const char *text) {
     return result.c_str();
 }
 const char *error(){return failure.c_str();}
-const macoblox_wayland_api api={MACOBLOX_WAYLAND_ABI,display,create,surface,action,poll,screen,cursor,clipboard,error,
+const macncheese_wayland_api api={MACNCHEESE_WAYLAND_ABI,display,create,surface,action,poll,screen,cursor,clipboard,error,
                               create_subwindow,subwindow_surface,subwindow_frame,subwindow_visible,destroy_subwindow};
 void shutdown() {
     stopping.store(true);
@@ -476,14 +476,14 @@ void shutdown() {
     }
 }
 }
-extern "C" const macoblox_wayland_api *macoblox_wayland_host_api() {
+extern "C" const macncheese_wayland_api *macncheese_wayland_host_api() {
     static std::once_flag once;
     static bool ready;
     std::call_once(once,[]{
         std::promise<bool> initialized;auto result=initialized.get_future();
         ui=std::thread([&initialized]{
-            SDL_SetHint("SDL_APP_ID","macoblox-roblox-window");
-            SDL_SetHint("SDL_VIDEO_WAYLAND_WMCLASS","macoblox-roblox-window");
+            SDL_SetHint("SDL_APP_ID","macncheese-roblox-window");
+            SDL_SetHint("SDL_VIDEO_WAYLAND_WMCLASS","macncheese-roblox-window");
             SDL_SetHint(SDL_HINT_VIDEO_WAYLAND_PREFER_LIBDECOR,"1");
             SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR,"0");
             /* Selecting Wayland explicitly forbids SDL's X11 fallback. */
@@ -496,7 +496,7 @@ extern "C" const macoblox_wayland_api *macoblox_wayland_host_api() {
             if(!bootstrap){initialized.set_value(false);return;}
             initialize_cursor_surfaces();
             SDL_StartTextInput();initialized.set_value(true);
-            std::fprintf(stderr,"[MacOBlox Wayland] Native Wayland display connected\n");
+            std::fprintf(stderr,"[MacNCheese Wayland] Native Wayland display connected\n");
             while(!stopping.load()) {
                 std::deque<std::function<void()>> batch;
                 {std::lock_guard<std::mutex> guard(queue_mutex);batch.swap(commands);}

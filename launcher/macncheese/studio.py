@@ -109,7 +109,7 @@ def installed_version():
 
 
 def _open(url, timeout=30):
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "MacOBlox"}),
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "MacNCheese"}),
                                   timeout=timeout)
 
 

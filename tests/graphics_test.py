@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from macoblox import core, graphics
+from macncheese import core, graphics
 
 
 class GraphicsTests(unittest.TestCase):
@@ -224,7 +224,7 @@ class GraphicsTests(unittest.TestCase):
         with patch.object(graphics.Path, "is_file", return_value=True):
             env = graphics.renderer_environment("vulkan")
         self.assertEqual(env["MESA_LOADER_DRIVER_OVERRIDE"], "zink")
-        self.assertEqual(env["MACOBLOX_METAL"], "0")
+        self.assertEqual(env["MACNCHEESE_METAL"], "0")
         self.assertEqual(env["EGL_PLATFORM"], "x11")
         self.assertTrue(env["__EGL_VENDOR_LIBRARY_FILENAMES"].endswith("50_mesa.json"))
 
@@ -265,7 +265,7 @@ class GraphicsTests(unittest.TestCase):
                 patch.object(core, "icon_argb_file", side_effect=OSError):
             env = dict(item.split("=", 1) for item in session.shim_variables())
         self.assertEqual(env["MESA_LOADER_DRIVER_OVERRIDE"], "zink")
-        self.assertEqual(env["MACOBLOX_METAL"], "0")
+        self.assertEqual(env["MACNCHEESE_METAL"], "0")
         self.assertEqual(env["__GL_SHADER_DISK_CACHE_PATH"], str(core.CACHE_DIR / "nvidia-shader-cache"))
         self.assertEqual(env["MANGOHUD"], "1")
         self.assertEqual(env["MANGOHUD_CONFIG"], "fps,frametime,gpu_name")
@@ -284,7 +284,7 @@ class GraphicsTests(unittest.TestCase):
                 patch.object(graphics.Path, "is_file", return_value=True):
             env = graphics.mangohud_environment("opengl", True)
         self.assertEqual(env["MANGOHUD"], "1")
-        self.assertTrue(env["MACOBLOX_MANGOHUD_OPENGL"].endswith("libMangoHud_opengl.so"))
+        self.assertTrue(env["MACNCHEESE_MANGOHUD_OPENGL"].endswith("libMangoHud_opengl.so"))
         self.assertEqual(env["MANGOHUD_CONFIG"], settings["MANGOHUD_CONFIG"])
         self.assertEqual(env["MANGOHUD_CONFIGFILE"], settings["MANGOHUD_CONFIGFILE"])
         self.assertNotIn("LD_PRELOAD", env)
@@ -306,7 +306,7 @@ class GraphicsTests(unittest.TestCase):
                 patch.object(core, "icon_argb_file", side_effect=OSError):
             host = session.environment()
             guest = dict(item.split("=", 1) for item in session.shim_variables())
-        for name in ("MANGOHUD", "MACOBLOX_MANGOHUD_OPENGL"):
+        for name in ("MANGOHUD", "MACNCHEESE_MANGOHUD_OPENGL"):
             self.assertEqual(host[name], guest[name])
         self.assertEqual(guest["MANGOHUD"], "1")
 

@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Mac O’ Blox Roblox Link Handler
-Comment=Open Roblox links in Mac O’ Blox
-Exec=macoblox %u
-Icon=macoblox
+Name=Mac'n Cheese Roblox Link Handler
+Comment=Open Roblox links in Mac'n Cheese
+Exec=macncheese %u
+Icon=macncheese
 Terminal=false
 NoDisplay=true
 MimeType=x-scheme-handler/roblox;x-scheme-handler/roblox-player;

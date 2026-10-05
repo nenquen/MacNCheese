@@ -1,4 +1,4 @@
-"""GTK 4 / libadwaita interface of the Mac O’ Blox launcher."""
+"""GTK 4 / libadwaita interface of the Mac'n Cheese launcher."""
 
 import json
 import os
@@ -17,7 +17,7 @@ from . import __version__, author, core, discord, dns, i18n, mods, studio, uri a
 from .i18n import _  # noqa: E402
 from .setup import SetupWizard  # noqa: E402
 
-APP_ID = "wtf.aubree.MacOBlox"
+APP_ID = "org.macncheese.MacNCheese"
 
 # Common fast flags. Roblox only honours flags on its client allowlist, so
 # some of these may have no effect in a given client version.
@@ -76,10 +76,10 @@ def _button_row(title):
 
 def _error_dialog(window, heading, details):
     """Shows the whole error text, selectable and with a copy button, so
-    people can send it. Also kept in ~/.cache/macoblox/last-error.txt."""
+    people can send it. Also kept in ~/.cache/macncheese/last-error.txt."""
     try:
         core.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        (core.CACHE_DIR / "last-error.txt").write_text(f"Mac O’ Blox {__version__}\n{heading}\n\n{details}\n")
+        (core.CACHE_DIR / "last-error.txt").write_text(f"Mac'n Cheese {__version__}\n{heading}\n\n{details}\n")
     except OSError:
         pass
     dialog = Adw.AlertDialog(heading=heading)
@@ -96,7 +96,7 @@ def _error_dialog(window, heading, details):
 
     def response(_dialog, result):
         if result == "copy":
-            window.get_clipboard().set(f"Mac O’ Blox {__version__}\n{heading}\n\n{details}")
+            window.get_clipboard().set(f"Mac'n Cheese {__version__}\n{heading}\n\n{details}")
 
     dialog.connect("response", response)
     dialog.present(window)
@@ -226,7 +226,7 @@ class GameLogsView(Gtk.Box):
         self.tag_info = self.buffer.create_tag("log_info", foreground="#3584e4")
         self.tag_success = self.buffer.create_tag("log_success", foreground="#33d17a", weight=Pango.Weight.BOLD)
         self.tag_debug = self.buffer.create_tag("log_debug", foreground="#7f848e")
-        self.tag_macoblox = self.buffer.create_tag("log_macoblox", foreground="#c061cb", weight=Pango.Weight.BOLD)
+        self.tag_macncheese = self.buffer.create_tag("log_macncheese", foreground="#c061cb", weight=Pango.Weight.BOLD)
         self.tag_match = self.buffer.create_tag("search_match", background="#2a5c9a", foreground="#ffffff")
         self.tag_current = self.buffer.create_tag("search_current", background="#f6d32d", foreground="#000000")
         self._ts_re = re.compile(r"^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[^\s,]*)(.*)$")
@@ -327,8 +327,8 @@ class GameLogsView(Gtk.Box):
         for line in lines:
             self.line_count += 1
             ll = line.lower()
-            if "[macoblox]" in ll:
-                tag = self.tag_macoblox
+            if "[macncheese]" in ll:
+                tag = self.tag_macncheese
             elif any(k in ll for k in ("error", "crash", "fatal", "sigsegv", "exception", "abort")):
                 tag = self.tag_err
             elif any(k in ll for k in ("warning", "warn")):
@@ -439,8 +439,8 @@ class PlayPage(Adw.Bin):
         self.top_box = None
 
         status = Adw.StatusPage()
-        status.set_icon_name("macoblox")
-        status.set_title("Mac O’ Blox")
+        status.set_icon_name("macncheese")
+        status.set_title("Mac'n Cheese")
         self.status = status
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
@@ -983,7 +983,7 @@ class SettingsPage(Adw.Bin):
         # 1. Environment page (Interface, Game, DNS, Diagnostics)
         self.env_page = Adw.PreferencesPage()
 
-        launcher_group = Adw.PreferencesGroup(title="Mac O’ Blox")
+        launcher_group = Adw.PreferencesGroup(title="Mac'n Cheese")
         self.launcher_version_row = Adw.ActionRow(
             title=_("Launcher version"),
             subtitle=f"v{__version__}"
@@ -1158,7 +1158,7 @@ class SettingsPage(Adw.Bin):
 
         self.discord_icon = Adw.SwitchRow(
             title=_("Show experience thumbnail in Discord"),
-            subtitle=_("Replace the Mac O’ Blox icon with the game's icon"),
+            subtitle=_("Replace the Mac'n Cheese icon with the game's icon"),
             active=settings.get("discord_rpc_icon", False),
         )
         self.discord_icon.set_sensitive(settings.get("discord_rpc", True))
@@ -1369,7 +1369,7 @@ class SettingsPage(Adw.Bin):
                 _toast(self.window.toasts, _("Update {version} available", version=tag))
             else:
                 self.check_launcher_btn.set_label(_("Check for updates"))
-                _toast(self.window.toasts, _("Mac O’ Blox is up to date"))
+                _toast(self.window.toasts, _("Mac'n Cheese is up to date"))
 
         self._in_thread(core.check_launcher_update, done)
 
@@ -1629,15 +1629,15 @@ class SettingsPage(Adw.Bin):
         self._in_thread(core.restart_darling, done)
 
 
-ABOUT = ("Mac O’ Blox runs the real Roblox client for macOS on Linux through Darling. "
+ABOUT = ("Mac'n Cheese runs the real Roblox client for macOS on Linux through Darling. "
          "It is not made by Roblox and is not affiliated with it.")
 
 
 def _links():
     """(title, icon, uri) of the project's community pages."""
-    links = [("Discord", "macoblox-discord-symbolic", author.DISCORD_URL)]
+    links = [("Discord", "macncheese-discord-symbolic", author.DISCORD_URL)]
     if author.GITHUB_URL:
-        links.append(("GitHub", "macoblox-github-symbolic", author.GITHUB_URL))
+        links.append(("GitHub", "macncheese-github-symbolic", author.GITHUB_URL))
     return links
 
 
@@ -1687,7 +1687,7 @@ class InfoPage(Adw.PreferencesPage):
         super().__init__(title=_("Info"), icon_name="help-about-symbolic")
         self.window = window
 
-        about = Adw.PreferencesGroup(title="Mac O’ Blox", description=_(ABOUT))
+        about = Adw.PreferencesGroup(title="Mac'n Cheese", description=_(ABOUT))
         self.add(about)
 
         community = Adw.PreferencesGroup(title=_("Community"))
@@ -2019,7 +2019,7 @@ class ModsPage(Adw.Bin):
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Mac O’ Blox")
+        super().__init__(application=app, title="Mac'n Cheese")
         self.set_default_size(760, 580)
         self.set_resizable(True)
         self.settings = core.load_settings()
@@ -2038,8 +2038,8 @@ class LauncherWindow(Adw.ApplicationWindow):
         setup_action = Gio.SimpleAction.new("setup", None)
         setup_action.connect("activate", lambda *_args: self.show_setup())
         self.add_action(setup_action)
-        # MACOBLOX_PAGE opens another tab first (for screenshots).
-        self.build(os.environ.get("MACOBLOX_PAGE", "play"))
+        # MACNCHEESE_PAGE opens another tab first (for screenshots).
+        self.build(os.environ.get("MACNCHEESE_PAGE", "play"))
         if not self.setup_active:
             threading.Thread(target=self._check_startup_update, daemon=True).start()
 
@@ -2075,7 +2075,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         # Sidebar with the page list
         sidebar_toolbar = Adw.ToolbarView()
         sidebar_header = Adw.HeaderBar(show_end_title_buttons=False, show_start_title_buttons=False)
-        sidebar_header.set_title_widget(Gtk.Label(label="Mac O’ Blox", css_classes=["heading"]))
+        sidebar_header.set_title_widget(Gtk.Label(label="Mac'n Cheese", css_classes=["heading"]))
         sidebar_version = Gtk.Label(label=f"v{__version__}", css_classes=["dim-label", "caption"], margin_end=6)
         sidebar_header.pack_end(sidebar_version)
         sidebar_toolbar.add_top_bar(sidebar_header)
@@ -2166,7 +2166,7 @@ class LauncherWindow(Adw.ApplicationWindow):
     def _show_launcher_update_dialog(self, tag):
         dialog = Adw.AlertDialog(
             heading=_("Update available"),
-            body=_("A new version of Mac O’ Blox ({version}) is available. Update now?", version=tag)
+            body=_("A new version of Mac'n Cheese ({version}) is available. Update now?", version=tag)
         )
         dialog.add_response("later", _("Later"))
         dialog.add_response("update", _("Update"))
@@ -2279,7 +2279,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             return
         dialog = Adw.AlertDialog(
             heading=_("Install Roblox Studio?"),
-            body=_("Studio runs in its Windows version through Wine. Mac O’ Blox downloads Wine, "
+            body=_("Studio runs in its Windows version through Wine. Mac'n Cheese downloads Wine, "
                    "DXVK and Studio, about 800 MB."))
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("install", _("Install"))
@@ -2406,24 +2406,24 @@ class LauncherWindow(Adw.ApplicationWindow):
             state = _("by {creator}", creator=creator) if creator else _("In Game")
             icon_url = info.get("icon_url")
             use_icon = self.settings.get("discord_rpc_icon", False) and bool(icon_url)
-            large_image = icon_url if use_icon else "macoblox"
+            large_image = icon_url if use_icon else "macncheese"
             large_text = details
-            small_image = "macoblox" if use_icon else None
-            small_text = "Mac O’ Blox" if use_icon else None
+            small_image = "macncheese" if use_icon else None
+            small_text = "Mac'n Cheese" if use_icon else None
         elif info:
             # Game is active (either fetching details or user hid experience name in settings)
             details = _("Playing Roblox")
             state = _("In Game")
-            large_image = "macoblox"
-            large_text = "Mac O’ Blox"
+            large_image = "macncheese"
+            large_text = "Mac'n Cheese"
             small_image = None
             small_text = None
         else:
             # Menu (not in an experience)
             details = _("In Main Menu")
             state = None
-            large_image = "macoblox"
-            large_text = "Mac O’ Blox"
+            large_image = "macncheese"
+            large_text = "Mac'n Cheese"
             small_image = None
             small_text = None
 
@@ -2608,7 +2608,7 @@ class LauncherApp(Adw.Application):
     def do_activate(self):
         pending = uri_handoff.peek_pending()
         if not self.window:
-            Gtk.Window.set_default_icon_name("macoblox")
+            Gtk.Window.set_default_icon_name("macncheese")
             Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(
                 str(core.PROJECT / "launcher" / "icons"))
             self.window = LauncherWindow(self)
@@ -2617,7 +2617,7 @@ class LauncherApp(Adw.Application):
             self.window.connect("close-request", self._close)
         self.window.set_visible(True)
         self.window.present()
-        if os.environ.get("MACOBLOX_PAGE"):
+        if os.environ.get("MACNCHEESE_PAGE"):
             # Screenshots: no focused field.
             GLib.timeout_add(300, lambda: self.window.set_focus(None) and False)
         if pending:

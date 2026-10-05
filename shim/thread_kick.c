@@ -23,7 +23,7 @@
  * When the watchdog asks, the handler also records where the thread was (RIP
  * and the frame-pointer chain within its stack); the watchdog thread names the
  * addresses with dladdr, which is not safe inside a signal handler.
- * MACOBLOX_NO_KICK=1 turns the kicks off (stalls and long mutex waits are
+ * MACNCHEESE_NO_KICK=1 turns the kicks off (stalls and long mutex waits are
  * still logged, without the location).
  *
  * A kick must only reach a thread that is still in the wait it was meant
@@ -65,7 +65,7 @@ static volatile int tid_key_ready;
 
 /* The Linux id of the calling thread, cached in a pthread TSD slot (not a
  * __thread variable, see darling_fixes.c). */
-long macoblox_thread_id(void) {
+long macncheese_thread_id(void) {
     if (!tid_key_ready)
         return linux_syscall3(LINUX_GETTID, 0, 0, 0);
     long tid = (long)pthread_getspecific(tid_key);
@@ -158,7 +158,7 @@ static int ask_location(long tid, unsigned long long now) {
 }
 
 __attribute__((constructor)) static void install_kick_handler(void) {
-    const char *off = getenv("MACOBLOX_NO_KICK");
+    const char *off = getenv("MACNCHEESE_NO_KICK");
     kicks_enabled = !(off && off[0] && off[0] != '0');
     if (pthread_key_create(&tid_key, 0) == 0)
         tid_key_ready = 1;
@@ -168,8 +168,8 @@ __attribute__((constructor)) static void install_kick_handler(void) {
 }
 
 /* Kick `tid`; with `locate`, also ask it to record where it is (see
- * macoblox_located). Called by the watchdog thread only. */
-int macoblox_kick(long tid, int locate) {
+ * macncheese_located). Called by the watchdog thread only. */
+int macncheese_kick(long tid, int locate) {
     if (tid <= 0)
         return -1;
     if (locate)
@@ -179,7 +179,7 @@ int macoblox_kick(long tid, int locate) {
     return (int)linux_syscall3(LINUX_TGKILL, linux_syscall3(LINUX_GETPID, 0, 0, 0), tid, LINUX_SIGURG);
 }
 
-int macoblox_kicks_enabled(void) { return kicks_enabled; }
+int macncheese_kicks_enabled(void) { return kicks_enabled; }
 
 static void append(char *out, size_t size, size_t *used, const char *text) {
     while (*text && *used + 1 < size)
@@ -189,7 +189,7 @@ static void append(char *out, size_t size, size_t *used, const char *text) {
 
 /* If `tid` has recorded its location, write it as "lib (symbol+offset) <
  * caller < ..." to `out`, free the request and return 1. */
-int macoblox_located(long tid, char *out, size_t size) {
+int macncheese_located(long tid, char *out, size_t size) {
     int slot = 0;
     while (slot < LOCATION_SLOTS && !(locations[slot].tid == tid && locations[slot].ready))
         slot++;
@@ -237,8 +237,8 @@ static struct {
 static volatile long lock_kicks, lock_waits_seen;
 
 /* darling_fixes.c calls these around a mutex wait that has to sleep. */
-int macoblox_wait_begin(void) {
-    long tid = macoblox_thread_id();
+int macncheese_wait_begin(void) {
+    long tid = macncheese_thread_id();
     for (int i = 0; i < MAX_WAITERS; i++) {
         if (__sync_bool_compare_and_swap(&waiters[i].tid, 0, tid)) {
             unsigned long long now = mach_absolute_time();
@@ -253,7 +253,7 @@ int macoblox_wait_begin(void) {
     return -1;
 }
 
-void macoblox_wait_end(int slot) {
+void macncheese_wait_end(int slot) {
     if (slot < 0)
         return;
     waiters[slot].since = 0;
@@ -263,7 +263,7 @@ void macoblox_wait_end(int slot) {
 
 static void report_wait(long tid, unsigned long long waited, const char *what, const char *where) {
     char line[1400];
-    int length = snprintf(line, sizeof line, "[MacOBlox Lock] thread %ld waiting %llu ms for a mutex, %s%s%s\n",
+    int length = snprintf(line, sizeof line, "[MacNCheese Lock] thread %ld waiting %llu ms for a mutex, %s%s%s\n",
                           tid, waited / 1000000ULL, what, where ? "; at: " : "", where ? where : "");
     if (length > 0)
         write(2, line, (size_t)length < sizeof line ? (size_t)length : sizeof line - 1);
@@ -272,7 +272,7 @@ static void report_wait(long tid, unsigned long long waited, const char *what, c
 /* Called by the watchdog every tick: kick waits longer than 250 ms, then
  * every 0.5 s, 1 s, 1 s ... while they last. The first waits are logged,
  * with the waiting thread's location when it records one within a second. */
-void macoblox_kick_stuck_waiters(unsigned long long now) {
+void macncheese_kick_stuck_waiters(unsigned long long now) {
     for (int i = 0; i < MAX_WAITERS; i++) {
         long tid = waiters[i].tid;
         unsigned long long since = waiters[i].since;
@@ -280,7 +280,7 @@ void macoblox_kick_stuck_waiters(unsigned long long now) {
             continue;
         if (waiters[i].report == LOCATING) {
             char where[1200];
-            if (macoblox_located(tid, where, sizeof where)) {
+            if (macncheese_located(tid, where, sizeof where)) {
                 waiters[i].report = REPORTED;
                 report_wait(tid, now - since, "kicked", where);
             } else if (now - waiters[i].asked > LOCATION_EXPIRES_NS) {
@@ -296,7 +296,7 @@ void macoblox_kick_stuck_waiters(unsigned long long now) {
             long seen = __sync_add_and_fetch(&lock_waits_seen, 1);
             int log = seen <= 20 || seen % 100 == 0;
             if (log && !kicks_enabled)
-                report_wait(tid, now - since, "not kicked (MACOBLOX_NO_KICK)", 0);
+                report_wait(tid, now - since, "not kicked (MACNCHEESE_NO_KICK)", 0);
             waiters[i].report = log && kicks_enabled ? LOCATING : REPORTED;
             waiters[i].asked = now;
         }
@@ -308,8 +308,8 @@ void macoblox_kick_stuck_waiters(unsigned long long now) {
         if (waiters[i].tid != tid || waiters[i].since != since)
             continue;
         __sync_add_and_fetch(&lock_kicks, 1);
-        macoblox_kick(tid, waiters[i].report == LOCATING);
+        macncheese_kick(tid, waiters[i].report == LOCATING);
     }
 }
 
-long macoblox_lock_kick_count(void) { return lock_kicks; }
+long macncheese_lock_kick_count(void) { return lock_kicks; }

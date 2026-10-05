@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from macoblox import core, shader_patches as shaders
+from macncheese import core, shader_patches as shaders
 
 
 def fixture():
@@ -161,7 +161,7 @@ class ShaderPatchTests(unittest.TestCase):
                 self.assertEqual(self.plan(pack.read_bytes()), ("already patched", None))
                 unknown = self.data + b"modded pack"
                 pack.write_bytes(unknown)
-                with self.assertLogs("macoblox", level="WARNING") as log:
+                with self.assertLogs("macncheese", level="WARNING") as log:
                     core.ensure_shader_compatibility()
                 self.assertIn("unsupported shader pack", log.output[0])
                 self.assertEqual(pack.read_bytes(), unknown)
@@ -176,7 +176,7 @@ class ShaderPatchTests(unittest.TestCase):
                 apply.assert_not_called()
                 pack.parent.mkdir(parents=True)
                 pack.touch()
-                with self.assertLogs("macoblox", level="WARNING") as log:
+                with self.assertLogs("macncheese", level="WARNING") as log:
                     core.ensure_shader_compatibility()
                 self.assertIn("write failed", log.output[0])
 

@@ -70,7 +70,7 @@ void checkEntryPoint(const unsigned char *spirv, size_t length, uint32_t stage,
 void *Iridium::translate(const void *source, size_t length, size_t &size, OutputInfo &output) {
     size = 0;
     output.functionInfos.clear();
-    const char *cache = std::getenv("MACOBLOX_METAL_SHADER_CACHE");
+    const char *cache = std::getenv("MACNCHEESE_METAL_SHADER_CACHE");
     if (!cache || !source || length > std::numeric_limits<unsigned int>::max())
         throw std::runtime_error("Native Metal requires a validated shader cache");
     unsigned char digest[32];

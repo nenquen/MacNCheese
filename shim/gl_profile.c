@@ -36,7 +36,7 @@ static volatile unsigned int formats_lock;
 static __thread unsigned int wanted_profile;
 
 static int core_enabled(void) {
-    const char *text = getenv("MACOBLOX_GL_COMPAT");
+    const char *text = getenv("MACNCHEESE_GL_COMPAT");
     return !(text && text[0] == '1');
 }
 
@@ -51,7 +51,7 @@ static int takes_value(unsigned int attribute) {
     return 0;
 }
 
-void macoblox_note_pixel_format(void *format, const unsigned int *attributes) {
+void macncheese_note_pixel_format(void *format, const unsigned int *attributes) {
     unsigned int profile = 0;
     for (int index = 0; attributes && index < 64 && attributes[index]; index++) {
         if (attributes[index] == NSOpenGLPFAOpenGLProfile)
@@ -59,7 +59,7 @@ void macoblox_note_pixel_format(void *format, const unsigned int *attributes) {
         if (takes_value(attributes[index]))
             index++;
     }
-    macoblox_lock(&formats_lock);
+    macncheese_lock(&formats_lock);
     int slot = 0;
     for (int i = 0; i < 32; i++) {
         if (formats[i].format == format || !formats[i].format) { slot = i; break; }
@@ -67,25 +67,25 @@ void macoblox_note_pixel_format(void *format, const unsigned int *attributes) {
     }
     formats[slot].format = format;
     formats[slot].profile = profile;
-    macoblox_unlock(&formats_lock);
+    macncheese_unlock(&formats_lock);
 }
 
-void macoblox_prepare_context(void *format) {
+void macncheese_prepare_context(void *format) {
     unsigned int profile = 0;
-    macoblox_lock(&formats_lock);
+    macncheese_lock(&formats_lock);
     for (int i = 0; i < 32; i++)
         if (format && formats[i].format == format)
             profile = formats[i].profile;
-    macoblox_unlock(&formats_lock);
+    macncheese_unlock(&formats_lock);
     wanted_profile = core_enabled() ? profile : 0;
 }
 
-void macoblox_finish_context(void) {
+void macncheese_finish_context(void) {
     wanted_profile = 0;
 }
 
-static void *macoblox_eglCreateContext(void *display, void *config, void *share, const int *attributes) {
-    if (!macoblox_bind_desktop_gl())
+static void *macncheese_eglCreateContext(void *display, void *config, void *share, const int *attributes) {
+    if (!macncheese_bind_desktop_gl())
         return 0;
     unsigned int profile = wanted_profile;
     if (profile >= 0x3200 && !attributes) {
@@ -99,27 +99,27 @@ static void *macoblox_eglCreateContext(void *display, void *config, void *share,
                           EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
             void *context = eglCreateContext(display, config, share, core);
             if (context) {
-                macoblox_register_egl_context(context);
+                macncheese_register_egl_context(context);
                 char line[120];
-                int length = snprintf(line, sizeof line, "[MacOBlox GL] Core Profile %d.%d context for Roblox: created\n",
+                int length = snprintf(line, sizeof line, "[MacNCheese GL] Core Profile %d.%d context for Roblox: created\n",
                                       versions[i][0], versions[i][1]);
                 if (length > 0) write(2, line, (unsigned long)length);
                 return context;
             }
         }
-        write(2, "[MacOBlox GL] Core Profile context failed, using Compatibility\n", 63);
+        write(2, "[MacNCheese GL] Core Profile context failed, using Compatibility\n", 63);
     }
     void *context = eglCreateContext(display, config, share, attributes);
     if (context)
-        macoblox_register_egl_context(context);
+        macncheese_register_egl_context(context);
     return context;
 }
-DYLD_INTERPOSE(macoblox_eglCreateContext, eglCreateContext)
+DYLD_INTERPOSE(macncheese_eglCreateContext, eglCreateContext)
 
 /* Roblox turns off multisampled textures (and with them MSAA) when
  * GL_RENDERER contains "AMD", a workaround for Apple's AMD drivers since
  * macOS 10.12. Mesa's radeonsi does not have that bug, so Roblox gets the
- * renderer name without the vendor word. MACOBLOX_GL_COMPAT=1 keeps it. */
+ * renderer name without the vendor word. MACNCHEESE_GL_COMPAT=1 keeps it. */
 extern const unsigned char *glGetString(unsigned int);
 
 extern char *strstr(const char *, const char *);
@@ -136,8 +136,8 @@ struct renderer_name {
 static struct renderer_name *renderer_names;
 static volatile unsigned int renderer_lock;
 
-void macoblox_forget_gl_context(void *context) {
-    macoblox_lock(&renderer_lock);
+void macncheese_forget_gl_context(void *context) {
+    macncheese_lock(&renderer_lock);
     struct renderer_name **link = &renderer_names;
     while (*link) {
         struct renderer_name *name = *link;
@@ -148,10 +148,10 @@ void macoblox_forget_gl_context(void *context) {
             link = &name->next;
         }
     }
-    macoblox_unlock(&renderer_lock);
+    macncheese_unlock(&renderer_lock);
 }
 
-static const unsigned char *macoblox_glGetString(unsigned int name) {
+static const unsigned char *macncheese_glGetString(unsigned int name) {
     static int reported;
     const unsigned char *value = glGetString(name);
     if (name == 0x1F01 && value && __sync_bool_compare_and_swap(&reported, 0, 1)) {
@@ -161,7 +161,7 @@ static const unsigned char *macoblox_glGetString(unsigned int name) {
         const char *text = (const char *)value;
         int software = strstr(text, "llvmpipe") || strstr(text, "softpipe") || strstr(text, "SWR");
         char line[512];
-        int length = snprintf(line, sizeof line, "[MacOBlox GL] renderer: %s (OpenGL %s)%s\n", text,
+        int length = snprintf(line, sizeof line, "[MacNCheese GL] renderer: %s (OpenGL %s)%s\n", text,
                               version ? (const char *)version : "?",
                               software ? " -- SOFTWARE RENDERING: the GPU driver is not in use" : "");
         if (length > 0) write(2, line, (unsigned long)length < sizeof line ? (unsigned long)length : sizeof line - 1);
@@ -172,17 +172,17 @@ static const unsigned char *macoblox_glGetString(unsigned int name) {
     if (!strstr(text, "AMD"))
         return value;
     void *context = eglGetCurrentContext();
-    macoblox_lock(&renderer_lock);
+    macncheese_lock(&renderer_lock);
     for (struct renderer_name *cached = renderer_names; cached; cached = cached->next)
         if (cached->context == context && cached->original == value) {
-            macoblox_unlock(&renderer_lock);
+            macncheese_unlock(&renderer_lock);
             return (const unsigned char *)cached->text;
         }
     unsigned long length = 0;
     while (text[length]) length++;
     struct renderer_name *cached = malloc(sizeof(*cached) + length + 1);
     if (!cached) {
-        macoblox_unlock(&renderer_lock);
+        macncheese_unlock(&renderer_lock);
         return value;
     }
     unsigned long out = 0;
@@ -198,10 +198,10 @@ static const unsigned char *macoblox_glGetString(unsigned int name) {
     cached->original = value;
     cached->next = renderer_names;
     renderer_names = cached;
-    macoblox_unlock(&renderer_lock);
+    macncheese_unlock(&renderer_lock);
     return (const unsigned char *)cached->text;
 }
-DYLD_INTERPOSE(macoblox_glGetString, glGetString)
+DYLD_INTERPOSE(macncheese_glGetString, glGetString)
 
 /* EGL config for Darling's windows.
  *
@@ -216,7 +216,7 @@ extern unsigned int eglChooseConfig(void *, const int *, void **, int, int *);
 extern unsigned int eglGetConfigAttrib(void *, void *, int, int *);
 extern void *eglCreateWindowSurface(void *, void *, unsigned long, const int *);
 extern int eglGetError(void);
-extern int macoblox_raw_x_visuals(unsigned int, unsigned int *, unsigned int *);
+extern int macncheese_raw_x_visuals(unsigned int, unsigned int *, unsigned int *);
 
 #define EGL_BLUE_SIZE 0x3022
 #define EGL_GREEN_SIZE 0x3023
@@ -261,10 +261,10 @@ static void log_line(const char *text) {
     write(2, text, (unsigned long)length);
 }
 
-static unsigned int macoblox_eglChooseConfig(void *display, const int *attributes, void **configs,
+static unsigned int macncheese_eglChooseConfig(void *display, const int *attributes, void **configs,
                                              int size, int *count) {
-    extern int macoblox_wayland_enabled(void);
-    if (macoblox_wayland_enabled() && darling_default_attributes(attributes)) {
+    extern int macncheese_wayland_enabled(void);
+    if (macncheese_wayland_enabled() && darling_default_attributes(attributes)) {
         static const int wanted[] = {EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
             EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8,
             EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_NONE};
@@ -274,53 +274,53 @@ static unsigned int macoblox_eglChooseConfig(void *display, const int *attribute
     if (!ok || !configs || size < 1 || !count || *count < 1 || !darling_default_attributes(attributes))
         return ok;
     unsigned int root_visual = 0;
-    if (!macoblox_raw_x_visuals(0, &root_visual, 0) || !root_visual)
+    if (!macncheese_raw_x_visuals(0, &root_visual, 0) || !root_visual)
         return ok;
     int chosen = config_visual(display, configs[0]);
     if ((unsigned int)chosen == root_visual)
         return ok;
     void *better = config_for_visual(display, root_visual);
     char line[160];
-    snprintf(line, sizeof line, "[MacOBlox GL] EGL config visual 0x%x, screen visual 0x%x: %s\n",
+    snprintf(line, sizeof line, "[MacNCheese GL] EGL config visual 0x%x, screen visual 0x%x: %s\n",
              chosen, root_visual, better ? "using a config for the screen visual" : "no config for it");
     log_line(line);
     if (better)
         configs[0] = better;
     return ok;
 }
-DYLD_INTERPOSE(macoblox_eglChooseConfig, eglChooseConfig)
+DYLD_INTERPOSE(macncheese_eglChooseConfig, eglChooseConfig)
 
 static void forget_configured_surface(void *surface);
 
-static void *macoblox_eglCreateWindowSurface(void *display, void *config, unsigned long window,
+static void *macncheese_eglCreateWindowSurface(void *display, void *config, unsigned long window,
                                              const int *attributes) {
     void *surface = eglCreateWindowSurface(display, config, window, attributes);
     if (surface) {
         forget_configured_surface(surface); /* a new surface at an old address */
-        const char *trace = getenv("MACOBLOX_TRACE_CGL");
+        const char *trace = getenv("MACNCHEESE_TRACE_CGL");
         if (trace && trace[0] == '1') {
             char line[160];
-            snprintf(line, sizeof line, "[MacOBlox GL] eglCreateWindowSurface window 0x%lx -> surface %p\n", window, surface);
+            snprintf(line, sizeof line, "[MacNCheese GL] eglCreateWindowSurface window 0x%lx -> surface %p\n", window, surface);
             log_line(line);
         }
         return surface;
     }
-    int error = macoblox_capture_egl_error();
-    extern int macoblox_wayland_enabled(void);
-    if (macoblox_wayland_enabled()) {
+    int error = macncheese_capture_egl_error();
+    extern int macncheese_wayland_enabled(void);
+    if (macncheese_wayland_enabled()) {
         char line[160];
-        snprintf(line, sizeof line, "[MacOBlox Wayland] EGL surface failed: error 0x%x, native %p\n", error, (void *)window);
+        snprintf(line, sizeof line, "[MacNCheese Wayland] EGL surface failed: error 0x%x, native %p\n", error, (void *)window);
         log_line(line);
         return 0;
     }
     unsigned int root_visual = 0, window_visual = 0;
-    macoblox_raw_x_visuals((unsigned int)window, &root_visual, &window_visual);
+    macncheese_raw_x_visuals((unsigned int)window, &root_visual, &window_visual);
     void *matching = window_visual ? config_for_visual(display, window_visual) : 0;
     if (matching && matching != config)
         surface = eglCreateWindowSurface(display, matching, window, attributes);
     char line[200];
     snprintf(line, sizeof line,
-             "[MacOBlox GL] eglCreateWindowSurface failed (EGL error 0x%x): window visual 0x%x, "
+             "[MacNCheese GL] eglCreateWindowSurface failed (EGL error 0x%x): window visual 0x%x, "
              "config visual 0x%x, screen visual 0x%x; retry %s\n",
              error, window_visual, config_visual(display, config), root_visual,
              surface ? "with the window's visual worked" : "failed");
@@ -329,7 +329,7 @@ static void *macoblox_eglCreateWindowSurface(void *display, void *config, unsign
         forget_configured_surface(surface);
     return surface;
 }
-DYLD_INTERPOSE(macoblox_eglCreateWindowSurface, eglCreateWindowSurface)
+DYLD_INTERPOSE(macncheese_eglCreateWindowSurface, eglCreateWindowSurface)
 
 /* GL subwindows with the screen's visual.
  *
@@ -340,16 +340,16 @@ DYLD_INTERPOSE(macoblox_eglCreateWindowSurface, eglCreateWindowSurface)
  * of its own (0x2db, 24 bit, on an RTX 3050) that has no EGL config, so no
  * surface could be created for the game. Such a subwindow is replaced by one with
  * the screen's default visual, the one the EGL config above is chosen for.
- * Called from the X11SubWindow hook in libMacOBloxShims.m; libX11 loads
+ * Called from the X11SubWindow hook in libMacNCheeseShims.m; libX11 loads
  * with Darling's X11 backend, after this library, so it is looked up late.
- * MACOBLOX_KEEP_SUBWINDOW_VISUAL=1 keeps Darling's behaviour,
- * MACOBLOX_FORCE_SUBWINDOW_VISUAL=1 replaces every subwindow (to test). */
+ * MACNCHEESE_KEEP_SUBWINDOW_VISUAL=1 keeps Darling's behaviour,
+ * MACNCHEESE_FORCE_SUBWINDOW_VISUAL=1 replaces every subwindow (to test). */
 typedef unsigned long XID;
 extern void *dlsym(void *, const char *);
 #define X_DEFAULT_HANDLE ((void *)-2)  /* RTLD_DEFAULT */
 
-unsigned long macoblox_replace_gl_subwindow(void *display, unsigned long parent, unsigned long old) {
-    const char *keep = getenv("MACOBLOX_KEEP_SUBWINDOW_VISUAL");
+unsigned long macncheese_replace_gl_subwindow(void *display, unsigned long parent, unsigned long old) {
+    const char *keep = getenv("MACNCHEESE_KEEP_SUBWINDOW_VISUAL");
     if ((keep && keep[0] == '1') || !display || !parent || !old)
         return old;
     int (*get_attributes)(void *, XID, void *) = dlsym(X_DEFAULT_HANDLE, "XGetWindowAttributes");
@@ -373,7 +373,7 @@ unsigned long macoblox_replace_gl_subwindow(void *display, unsigned long parent,
         return old;
     int screen = screen_number ? screen_number(*(void **)(parent_attributes + 128)) : default_screen(display);
     void *visual = default_visual(display, screen);
-    const char *force = getenv("MACOBLOX_FORCE_SUBWINDOW_VISUAL");  /* for testing */
+    const char *force = getenv("MACNCHEESE_FORCE_SUBWINDOW_VISUAL");  /* for testing */
     if (!(force && force[0] == '1') && *(void **)(parent_attributes + 24) == visual)
         return old;
 
@@ -394,7 +394,7 @@ unsigned long macoblox_replace_gl_subwindow(void *display, unsigned long parent,
     if (*(int *)(old_attributes + 92) != 0 /* IsUnmapped */)
         map_window(display, window);
     destroy_window(display, old);
-    static const char message[] = "[MacOBlox GL] GL subwindow uses the screen visual\n";
+    static const char message[] = "[MacNCheese GL] GL subwindow uses the screen visual\n";
     write(2, message, sizeof message - 1);
     return window;
 }
@@ -409,14 +409,14 @@ unsigned long macoblox_replace_gl_subwindow(void *display, unsigned long parent,
  * belongs to the surface, not the context: a context that gets a new surface
  * would get vsync back); Roblox caps the frame rate itself
  * (DFIntTaskSchedulerTargetFps) and the compositor keeps the picture
- * tear-free. MACOBLOX_VSYNC=1 keeps vsync. MACOBLOX_FPS_LOG=1 prints the
+ * tear-free. MACNCHEESE_VSYNC=1 keeps vsync. MACNCHEESE_FPS_LOG=1 prints the
  * presented frame rate every 5 s. */
 extern unsigned int eglSwapInterval(void *, int);
 extern void *eglGetCurrentDisplay(void);
 extern void *eglGetCurrentSurface(int);
 extern unsigned long long mach_absolute_time(void);
-typedef struct { unsigned int numer, denom; } macoblox_timebase;
-extern int mach_timebase_info(macoblox_timebase *);
+typedef struct { unsigned int numer, denom; } macncheese_timebase;
+extern int mach_timebase_info(macncheese_timebase *);
 
 #define EGL_DRAW 0x3059
 #define CONFIGURED_SURFACES 16
@@ -431,17 +431,17 @@ static struct {
 } frame_windows[CONFIGURED_SURFACES];
 static unsigned int frame_next;
 static volatile unsigned int frame_lock;
-static macoblox_timebase frame_timebase;
+static macncheese_timebase frame_timebase;
 
 static void lock_configured(void) {
-    macoblox_lock(&configured_lock);
+    macncheese_lock(&configured_lock);
 }
 
 /* A client can change CGLCPSwapInterval after our first presentation. Darling
  * forwards that setter to EGL for the current draw surface. Forget only the
  * successful nonzero change, so the next presentation reapplies our configured
  * vsync policy without resetting frame statistics or other drawables. */
-static unsigned int macoblox_eglSwapInterval(void *display, int interval) {
+static unsigned int macncheese_eglSwapInterval(void *display, int interval) {
     unsigned int succeeded = eglSwapInterval(display, interval);
     if (succeeded && interval != 0) {
         void *surface = eglGetCurrentSurface(EGL_DRAW);
@@ -451,24 +451,24 @@ static unsigned int macoblox_eglSwapInterval(void *display, int interval) {
                 if (configured_surfaces[i].display == display &&
                     configured_surfaces[i].surface == surface)
                     configured_surfaces[i].surface = 0;
-            macoblox_unlock(&configured_lock);
+            macncheese_unlock(&configured_lock);
         }
     }
     return succeeded;
 }
-DYLD_INTERPOSE(macoblox_eglSwapInterval, eglSwapInterval)
+DYLD_INTERPOSE(macncheese_eglSwapInterval, eglSwapInterval)
 
 static void forget_configured_surface(void *surface) {
     lock_configured();
     for (int i = 0; i < CONFIGURED_SURFACES; i++)
         if (configured_surfaces[i].surface == surface)
             configured_surfaces[i].surface = 0;
-    macoblox_unlock(&configured_lock);
-    macoblox_lock(&frame_lock);
+    macncheese_unlock(&configured_lock);
+    macncheese_lock(&frame_lock);
     for (int i = 0; i < CONFIGURED_SURFACES; i++)
         if (frame_windows[i].surface == surface)
             frame_windows[i].surface = 0;
-    macoblox_unlock(&frame_lock);
+    macncheese_unlock(&frame_lock);
 }
 
 static void swap_interval_zero(void) {
@@ -481,7 +481,7 @@ static void swap_interval_zero(void) {
     lock_configured();
     for (int i = 0; i < CONFIGURED_SURFACES && !known; i++)
         known = configured_surfaces[i].surface == surface && configured_surfaces[i].display == display;
-    macoblox_unlock(&configured_lock);
+    macncheese_unlock(&configured_lock);
     if (known)
         return;
     if (!eglSwapInterval(display, 0))
@@ -490,10 +490,10 @@ static void swap_interval_zero(void) {
     configured_surfaces[configured_next].surface = surface;
     configured_surfaces[configured_next].display = display;
     configured_next = (configured_next + 1) % CONFIGURED_SURFACES;
-    macoblox_unlock(&configured_lock);
+    macncheese_unlock(&configured_lock);
     long count = __sync_add_and_fetch(&logged, 1);
     if (count <= 8 || count % 100 == 0)
-        write(2, "[MacOBlox GL] vsync off (swap interval 0)\n", 42);
+        write(2, "[MacNCheese GL] vsync off (swap interval 0)\n", 42);
 }
 
 static int environment_flag(const char *name, int *cache) {
@@ -507,21 +507,21 @@ static int environment_flag(const char *name, int *cache) {
     return enabled;
 }
 
-void macoblox_frame_presenting(void *cgl_context) {
+void macncheese_frame_presenting(void *cgl_context) {
     static int vsync = -1;
     (void)cgl_context; /* the interval goes with the current draw surface */
-    if (!environment_flag("MACOBLOX_VSYNC", &vsync))
+    if (!environment_flag("MACNCHEESE_VSYNC", &vsync))
         swap_interval_zero();
 }
 
-void macoblox_frame_presented(void *display, void *surface, unsigned int succeeded) {
+void macncheese_frame_presented(void *display, void *surface, unsigned int succeeded) {
     static int fps_log = -1;
-    if (!succeeded || !surface || !environment_flag("MACOBLOX_FPS_LOG", &fps_log))
+    if (!succeeded || !surface || !environment_flag("MACNCHEESE_FPS_LOG", &fps_log))
         return;
     unsigned long long now = mach_absolute_time();
     double fps = 0;
     int report = 0;
-    macoblox_lock(&frame_lock);
+    macncheese_lock(&frame_lock);
     if (!frame_timebase.denom && (mach_timebase_info(&frame_timebase) || !frame_timebase.denom))
         frame_timebase.numer = frame_timebase.denom = 1;
     unsigned int slot;
@@ -545,10 +545,10 @@ void macoblox_frame_presented(void *display, void *surface, unsigned int succeed
             report = 1;
         }
     }
-    macoblox_unlock(&frame_lock);
+    macncheese_unlock(&frame_lock);
     if (report) {
         char line[96];
-        int length = snprintf(line, sizeof line, "[MacOBlox FPS] %.1f surface=%p\n", fps, surface);
+        int length = snprintf(line, sizeof line, "[MacNCheese FPS] %.1f surface=%p\n", fps, surface);
         if (length > 0) write(2, line, (unsigned long)length < sizeof line ? (unsigned long)length : sizeof line - 1);
     }
 }
