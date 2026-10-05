@@ -17,7 +17,6 @@ fn defaults() -> HashMap<&'static str, Value> {
     m.insert("raw_mouse", Value::Bool(true));
     m.insert("display_backend", Value::from("x11"));
     m.insert("tui_font_scale", Value::from(1.0));
-    m.insert("tui_font", Value::from(""));
     m.insert("theme", Value::from("system"));
     m.insert("follow_system_theme", Value::Bool(true));
     m.insert("use_system_font", Value::Bool(true));

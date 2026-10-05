@@ -38,9 +38,9 @@ fn with_app_id(attrs: WindowAttributes) -> WindowAttributes {
     attrs
 }
 
-fn find_mono_font(preferred: &str) -> Option<Vec<u8>> {
+fn find_mono_font(_preferred: &str) -> Option<Vec<u8>> {
     let mut candidates = vec![];
-    let pattern = if preferred.is_empty() { "monospace".into() } else { preferred.to_string() };
+    let pattern = "monospace".to_string();
     if let Ok(out) = std::process::Command::new("fc-match")
         .args([&pattern, "--format=%{file}"])
         .output()
@@ -167,8 +167,8 @@ impl ApplicationHandler for Gui {
         }
         let window = Arc::new(el.create_window(attrs).unwrap());
         let stored = crate::settings::load();
-        let preferred = stored.get("tui_font").and_then(|v| v.as_str()).unwrap_or("");
-        let font_bytes = find_mono_font(preferred).unwrap_or_else(|| vec![]);
+        // Family is always the system monospace; only the scale is adjustable.
+        let font_bytes = find_mono_font("").unwrap_or_else(|| vec![]);
         let font = Font::new(if font_bytes.is_empty() {
             // Last resort: any bytes; backend falls back internally.
             Box::leak(vec![0u8; 4].into_boxed_slice())

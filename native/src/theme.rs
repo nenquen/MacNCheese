@@ -21,6 +21,24 @@ pub static DARK: Palette = Palette {
     err: Color::Red,
 };
 
+pub static CATPPUCCIN: Palette = Palette {
+    bg: Color::Rgb(30, 30, 46),
+    fg: Color::Rgb(205, 214, 244),
+    accent: Color::Rgb(203, 166, 247),
+    dim: Color::Rgb(108, 112, 134),
+    ok: Color::Rgb(166, 227, 161),
+    err: Color::Rgb(243, 139, 168),
+};
+
+pub static ROSE_PINE: Palette = Palette {
+    bg: Color::Rgb(25, 23, 36),
+    fg: Color::Rgb(224, 222, 244),
+    accent: Color::Rgb(196, 167, 231),
+    dim: Color::Rgb(110, 106, 134),
+    ok: Color::Rgb(156, 207, 216),
+    err: Color::Rgb(235, 111, 146),
+};
+
 pub static LIGHT: Palette = Palette {
     bg: Color::White,
     fg: Color::Black,
@@ -72,6 +90,8 @@ pub fn resolve(mode: &str) -> &'static Palette {
     match mode {
         "dark" => &DARK,
         "light" => &LIGHT,
+        "catppuccin" => &CATPPUCCIN,
+        "rose-pine" | "rosepine" | "rose" => &ROSE_PINE,
         _ => {
             if system_dark() {
                 &DARK
@@ -80,23 +100,6 @@ pub fn resolve(mode: &str) -> &'static Palette {
             }
         }
     }
-}
-
-/// Installed monospace families for the font picker.
-pub fn mono_fonts() -> Vec<String> {
-    let out = std::process::Command::new("fc-list")
-        .args([":spacing=mono", "family"])
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default();
-    let mut seen = std::collections::HashSet::new();
-    let mut fonts: Vec<String> = out
-        .split([',', '\n'])
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty() && seen.insert(s.clone()))
-        .collect();
-    fonts.sort();
-    fonts
 }
 
 #[cfg(test)]
@@ -112,8 +115,10 @@ mod tests {
     }
 
     #[test]
-    fn fonts_list_sane() {
-        let fonts = mono_fonts();
-        assert!(fonts.windows(2).all(|w| w[0] <= w[1]), "not sorted/deduped");
+    fn theme_names_resolve() {
+        assert!(std::ptr::eq(resolve("catppuccin"), &CATPPUCCIN));
+        assert!(std::ptr::eq(resolve("rose-pine"), &ROSE_PINE));
+        assert!(std::ptr::eq(resolve("rose"), &ROSE_PINE));
+        assert!(std::ptr::eq(resolve("nope"), resolve("system")));
     }
 }

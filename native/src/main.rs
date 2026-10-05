@@ -93,7 +93,6 @@ pub struct App {
     logs: Vec<std::path::PathBuf>,
     logs_state: ListState,
     log_tail: Vec<String>,
-    fonts: Vec<String>,
     start_tx: Sender<StartMsg>,
     start_rx: Receiver<StartMsg>,
     setup: SetupState,
@@ -127,7 +126,6 @@ impl App {
             logs: Vec::new(),
             logs_state: ListState::default(),
             log_tail: Vec::new(),
-            fonts: crate::theme::mono_fonts(),
             start_tx,
             start_rx,
             setup: SetupState::Idle,
@@ -410,7 +408,7 @@ impl App {
         match self.current() {
             Tab::Play => self.play_toggle(),
             Tab::Settings => {
-                if let Some(row) = setting_rows(self).get(self.settings_cursor) {
+                if let Some(row) = setting_rows().get(self.settings_cursor) {
                     row.left(&mut self.settings);
                     self.save_settings();
                 }
@@ -423,7 +421,7 @@ impl App {
     fn move_cursor(&mut self, delta: i32) {
         match self.current() {
             Tab::Settings => {
-                let n = setting_rows(self).len() as i32;
+                let n = setting_rows().len() as i32;
                 self.settings_cursor =
                     (self.settings_cursor as i32 + delta).clamp(0, n - 1) as usize;
             }
@@ -442,7 +440,7 @@ impl App {
         if self.current() != Tab::Settings {
             return;
         }
-        if let Some(row) = setting_rows(self).get(self.settings_cursor) {
+        if let Some(row) = setting_rows().get(self.settings_cursor) {
             if right {
                 row.right(&mut self.settings);
             } else {
@@ -472,7 +470,7 @@ impl App {
             }
             Some(Action::SettingsRow(i)) => {
                 self.settings_cursor = i;
-                if let Some(r) = setting_rows(self).get(i) {
+                if let Some(r) = setting_rows().get(i) {
                     r.left(&mut self.settings);
                     self.save_settings();
                 }
@@ -661,7 +659,7 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
 
 fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let y0 = area.y + 1;
-    let items: Vec<ListItem> = setting_rows(app)
+    let items: Vec<ListItem> = setting_rows()
         .iter()
         .enumerate()
         .map(|(i, row)| {
@@ -768,8 +766,8 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
 
 // ---------------------------------------------------------------- settings rows
 
-pub(crate) fn setting_rows(app: &App) -> Vec<Row> {
-    let mut out = vec![
+pub(crate) fn setting_rows() -> Vec<Row> {
+    vec![
         Row::Cycle {
             key: "renderer",
             title: "Renderer",
@@ -789,16 +787,13 @@ pub(crate) fn setting_rows(app: &App) -> Vec<Row> {
         Row::Cycle {
             key: "theme",
             title: "Color theme",
-            options: [("system", "System"), ("dark", "Dark"), ("light", "Light")]
+            options: [("system", "System"), ("dark", "Dark"), ("light", "Light"),
+                      ("catppuccin", "Catppuccin"), ("rose-pine", "Rosé Pine")]
                 .into_iter()
                 .map(|(a, b)| (a.to_string(), b.to_string()))
                 .collect(),
         },
-    ];
-    let mut fonts = vec![("".to_string(), "Auto (system monospace)".to_string())];
-    fonts.extend(app.fonts.iter().map(|f| (f.clone(), f.clone())));
-    out.push(Row::Cycle { key: "tui_font", title: "TUI font", options: fonts });
-    out
+    ]
 }
 
 pub(crate) enum Row {
@@ -903,10 +898,9 @@ mod tui_tests {
     #[test]
     fn settings_rows_mutate_in_range() {
         let mut settings = settings::load();
-        let app = App::new();
-        setting_rows(&app)[0].left(&mut settings);
+        setting_rows()[0].left(&mut settings);
         assert!(["opengl", "vulkan"].contains(&settings["renderer"].as_str().unwrap()));
-        setting_rows(&app)[1].right(&mut settings);
+        setting_rows()[1].right(&mut settings);
         let dpi = settings["dpi_scale"].as_f64().unwrap();
         assert!((1.0..=4.0).contains(&dpi), "dpi out of range: {dpi}");
     }
