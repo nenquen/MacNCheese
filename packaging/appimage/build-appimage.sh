@@ -58,6 +58,7 @@ cp -- "$REPO_ROOT/branding/icons/macncheese-256.png" "$APPDIR/macncheese.png"
 
 echo "==> deploying dependencies with sharun (strace mode)"
 export DISPLAY="${DISPLAY:-:0}"
+export DEPLOY_QT=1
 ./quick-sharun.sh "$APPDIR/usr/bin/macncheese" -- --help
 
 # AppRun is a real file (not a symlink): readlink -f on a symlink would

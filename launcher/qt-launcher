@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Mac'n Cheese Qt launcher entry point (KDE-native frontend)."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from qt.main import main
+
+sys.exit(main())
