@@ -54,6 +54,12 @@ sed "s|^Exec=.*|Exec=macncheese %u|; s|^Icon=.*|Icon=macncheese|" \
   "$REPO_ROOT/packaging/org.macncheese.MacNCheese.desktop" \
   > "$APPDIR/org.macncheese.MacNCheese.desktop"
 cp -- "$REPO_ROOT/branding/icons/macncheese-256.png" "$APPDIR/macncheese.png"
+
+
+echo "==> deploying dependencies with sharun (strace mode)"
+export DISPLAY="${DISPLAY:-:0}"
+./quick-sharun.sh "$APPDIR/usr/bin/macncheese" -- --help
+
 # AppRun is a real file (not a symlink): readlink -f on a symlink would
 # resolve into usr/bin and double the share path at runtime.
 cat > "$APPDIR/AppRun" <<'APPRUN'
@@ -78,10 +84,6 @@ fi
 exec python3 "$HERE/usr/share/macncheese/launcher/macncheese-launcher" "$@"
 APPRUN
 chmod +x -- "$APPDIR/AppRun"
-
-echo "==> deploying dependencies with sharun (strace mode)"
-export DISPLAY="${DISPLAY:-:0}"
-./quick-sharun.sh "$APPDIR/usr/bin/macncheese" -- --help
 
 echo "==> removing host-owned GPU stack from the bundle"
 # Mesa DRI drivers, GL/EGL/GLES, Vulkan loaders and ICDs must come from
