@@ -31,6 +31,7 @@ echo "==> staging AppDir"
 rm -rf -- "$APPDIR"
 mkdir -p -- "$APPDIR/usr/share/macncheese" "$APPDIR/usr/bin"
 cp -r -- "$REPO_ROOT/launcher" "$REPO_ROOT/branding" "$REPO_ROOT/shim" \
+  "$REPO_ROOT/frameworks" \
   "$REPO_ROOT/build_debug_shim.sh" "$REPO_ROOT/LICENSE" "$APPDIR/usr/share/macncheese/"
 rm -f -- "$APPDIR/usr/share/macncheese/launcher/install.sh"
 cat > "$APPDIR/usr/bin/macncheese" <<'LAUNCHER'
