@@ -564,6 +564,7 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
 
     let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
     let tabs = Tabs::new(titles)
+        .divider(Span::raw(" | "))
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -574,23 +575,17 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
     f.render_widget(tabs, chunks[0]);
-    // Clickable tab segments share the bar; map proportionally.
+    // Clickable tab segments follow the widget's own left-aligned layout:
+    // titles joined by " | ", starting just inside the border.
     let bar = chunks[0];
-    if !app.tabs.is_empty() && bar.width > 4 {
-        let usable = bar.width.saturating_sub(2) as usize;
-        let each = usable / app.tabs.len();
-        for (i, title) in app.tabs.iter().enumerate() {
-            let width = if i + 1 == app.tabs.len() {
-                usable.saturating_sub(each * i)
-            } else {
-                each
+    {
+        let mut x = bar.x + 1;
+        for (i, tab) in app.tabs.iter().enumerate() {
+            let w = (tab.title().len() + 2) as u16;
+            if x + w <= bar.x + bar.width.saturating_sub(1) {
+                app.clicks.push((Rect::new(x, bar.y + 1, w, 1), Action::Tab(i)));
             }
-            .max(title.title().len() + 2) as u16;
-            let x = bar.x + 1 + (each * i) as u16;
-            app.clicks.push((
-                Rect::new(x.min(bar.x + bar.width - 1), bar.y + 1, width.min(bar.width.saturating_sub(x - bar.x)), 1),
-                Action::Tab(i),
-            ));
+            x += w + 3; // title width + " | " divider
         }
     }
 
