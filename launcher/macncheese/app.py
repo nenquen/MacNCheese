@@ -2635,6 +2635,7 @@ class LauncherApp(Adw.Application):
             Gtk.Window.set_default_icon_name("macncheese")
             Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(
                 str(core.PROJECT / "launcher" / "icons"))
+            core.ensure_app_icon()
             self._apply_desktop_integration()
             self.window = LauncherWindow(self)
             # Keep running while the window is hidden during a game.

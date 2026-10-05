@@ -1405,6 +1405,35 @@ def restart_darling():
     clear_stale_darling()
 
 
+def ensure_app_icon():
+    """Copy the bundled icons into the user's icon theme.
+
+    A system install does this (launcher/install.sh); an AppImage or a raw
+    checkout does not, leaving StatusPage and window icons broken. Only
+    writes missing or outdated files, named per the hicolor spec.
+    Returns True when the "macncheese" icon resolves afterwards.
+    """
+    import shutil
+    data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    wrote = False
+    for source in sorted(ICONS.glob("macncheese-*.png")):
+        try:
+            size = int(source.stem.rsplit("-", 1)[1])
+        except (ValueError, IndexError):
+            continue
+        target = data_home / "icons" / "hicolor" / f"{size}x{size}" / "apps" / "macncheese.png"
+        try:
+            if target.exists() and target.stat().st_mtime >= source.stat().st_mtime \
+                    and target.stat().st_size == source.stat().st_size:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            wrote = True
+        except OSError:
+            continue
+    return wrote
+
+
 def icon_argb_file():
     """Write the logo in _NET_WM_ICON layout for the shim (see MACNCHEESE_ICON_ARGB)."""
     target = CACHE_DIR / "icon.argb"

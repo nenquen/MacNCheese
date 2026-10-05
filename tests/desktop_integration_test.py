@@ -50,3 +50,18 @@ class DesktopIntegrationTests(unittest.TestCase):
         self.assertIsNone(desktop.system_font(env={},
                                               gsettings=lambda k: None,
                                               kde_config=lambda: None))
+
+
+class AppIconTests(unittest.TestCase):
+    def test_icon_install_and_noop(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from macncheese import core
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(os.environ, {"XDG_DATA_HOME": directory}):
+                self.assertTrue(core.ensure_app_icon())
+                target = Path(directory) / "icons" / "hicolor" / "256x256" / "apps" / "macncheese.png"
+                self.assertTrue(target.is_file())
+                self.assertFalse(core.ensure_app_icon())
