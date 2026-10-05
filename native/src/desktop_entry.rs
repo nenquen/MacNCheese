@@ -53,6 +53,20 @@ pub fn ensure_menu_entry() {
             let _ = std::fs::write(&target, &desktop);
         }
     }
+    // The game window itself (X11 class RobloxPlayer) gets the same icon
+    // in docks, or it falls back to a generic one.
+    let game_entry = "[Desktop Entry]\n\
+        Type=Application\n\
+        Name=Roblox (Mac'n Cheese)\n\
+        Exec=macncheese\n\
+        Icon=macncheese\n\
+        NoDisplay=true\n\
+        StartupWMClass=RobloxPlayer\n";
+    let game_target = apps.join("macncheese-roblox-window.desktop");
+    if std::fs::read_to_string(&game_target).ok().as_deref() != Some(game_entry) {
+        let _ = std::fs::create_dir_all(&apps);
+        let _ = std::fs::write(&game_target, game_entry);
+    }
     // Icons from the payload (AppImage) or the checkout.
     let sources = paths::project().join("branding/icons");
     let mut touched = false;
