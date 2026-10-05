@@ -118,7 +118,7 @@ setup_plan() {
   [[ $dependencies != pacman ]] || dependencies='pacman and the AUR'
   printf '  %sSetup plan%s\n\n' "$BOLD" "$RESET"
   printf '    1. Prepare Darling and the system tools (%s).\n' "$dependencies"
-  printf '    2. %s the Mac O\047 Blox launcher.\n' "$operation"
+  printf '    2. %s the Mac'\047'n Cheese launcher.\n' "$operation"
   printf '    3. Build its compatibility libraries.\n'
   printf '    4. Add the app menu entry and macncheese command.\n\n'
   printf '  Computer    %s (%s)\n' "$(distribution_name)" "$(uname -m)"
@@ -180,9 +180,9 @@ setup_success() {
   local version
   version=$(installed_version)
   printf '\n%s%s Setup complete%s\n' "$GOOD" "$ON" "$RESET"
-  printf '  Mac O\047 Blox%s is ready in your app menu.\n' "${version:+ $version}"
+  printf '  Mac'\047'n Cheese%s is ready in your app menu.\n' "${version:+ $version}"
   printf '\n  %sNext steps%s\n' "$BOLD" "$RESET"
-  printf '    1. Open Mac O\047 Blox from the app menu, or run macncheese.\n'
+  printf '    1. Open Mac'\047'n Cheese from the app menu, or run macncheese.\n'
   if [[ -d $DIR/RobloxPlayer.app ]]; then
     printf '    2. Launch Roblox from the launcher.\n'
     printf '    3. Sign in if needed, then choose a game.\n'

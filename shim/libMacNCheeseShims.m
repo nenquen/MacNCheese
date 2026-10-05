@@ -1996,7 +1996,7 @@ static void macncheese_queue_pending_uri(id app) {
 // Window icon: MACNCHEESE_ICON_ARGB names a file of 32-bit little-endian words
 // in _NET_WM_ICON layout (width, height, ARGB pixels, repeated per size),
 // written by the launcher. It is set on the Roblox X window from a separate
-// X connection, so docks and window switchers show the Mac O Blox logo.
+// X connection, so docks and window switchers show the Mac'n Cheese logo.
 extern void* malloc(unsigned long);
 extern void free(void*);
 static unsigned long macncheese_icon_window;
