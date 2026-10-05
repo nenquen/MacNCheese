@@ -2073,7 +2073,7 @@ class LauncherWindow(Adw.ApplicationWindow):
         header.set_title_widget(Gtk.Label(label=""))
         menu = Gio.Menu()
         menu.append(_("Setup guide"), "win.setup")
-        header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
+        header.pack_start(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                                        tooltip_text=_("Launcher menu")))
 
         content_view.add_top_bar(header)
