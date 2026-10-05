@@ -56,6 +56,26 @@ if [ -z "${DARLING_SYSROOT:-}" ] && [ ! -d /usr/libexec/darling ] && [ ! -d /usr
   exit 1
 fi
 export MACNCHEESE_PROJECT="$HERE/usr/share/macncheese"
+# A TUI needs a terminal: double-clicked from a file manager there is none.
+# Non-interactive flags (--version/--help) run fine without one.
+case " $* " in
+  *" --version "*|*" --help "*|*" -V "*|*" -h "*) ;;
+  *)
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+      for term in konsole gnome-terminal xfce4-terminal alacritty kitty foot xterm; do
+        if command -v "$term" >/dev/null 2>&1; then
+          case "$term" in
+            gnome-terminal|xfce4-terminal) exec "$term" -- "$HERE/usr/bin/macncheese" "$@" ;;
+            *) exec "$term" -e "$HERE/usr/bin/macncheese" "$@" ;;
+          esac
+        fi
+      done
+      echo "Mac'n Cheese needs a terminal. Run it from one:" >&2
+      echo "  $HERE/usr/bin/macncheese" >&2
+      exit 1
+    fi
+    ;;
+esac
 exec "$HERE/usr/bin/macncheese" "$@"
 APPRUN
 chmod +x -- "$APPDIR/AppRun"
