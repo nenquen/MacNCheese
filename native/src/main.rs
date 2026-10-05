@@ -95,10 +95,12 @@ pub struct App {
     logs: Vec<std::path::PathBuf>,
     logs_state: ListState,
     log_tail: Vec<String>,
+    tail_follow: bool,
     flags_cursor: usize,
     flags_state: ListState,
     flag_edit: Option<FlagEdit>,
     tail_scroll: u16,
+    tail_max: usize,
     start_tx: Sender<StartMsg>,
     start_rx: Receiver<StartMsg>,
     setup: SetupState,
@@ -191,10 +193,12 @@ impl App {
             logs: Vec::new(),
             logs_state: ListState::default(),
             log_tail: Vec::new(),
+            tail_follow: true,
             flags_cursor: 0,
             flags_state: ListState::default(),
             flag_edit: None,
             tail_scroll: 0,
+            tail_max: 0,
             start_tx,
             start_rx,
             setup: SetupState::Idle,
@@ -419,15 +423,20 @@ impl App {
         }
     }
 
-    /// Mouse wheel: lists move, log tail scrolls.
+    /// Mouse wheel: lists move, log tail scrolls (down = newer).
     fn wheel(&mut self, delta: i32) {
         match self.current() {
             Tab::Settings | Tab::Flags => self.move_cursor(delta * 3),
-            Tab::Logs => {
-                self.tail_scroll = self.tail_scroll.saturating_add_signed((-delta * 5) as i16);
-            }
+            Tab::Logs => self.scroll_tail(delta * 10),
             _ => {}
         }
+    }
+
+    fn scroll_tail(&mut self, delta: i32) {
+        let max = self.tail_max as i32;
+        let next = (self.tail_scroll as i32 + delta).clamp(0, max);
+        self.tail_scroll = next as u16;
+        self.tail_follow = next >= max;
     }
 
     fn on_key(&mut self, key: Key) -> KeyAction {
@@ -487,13 +496,13 @@ impl App {
             }
             Key::PageUp => {
                 if self.current() == Tab::Logs {
-                    self.tail_scroll = self.tail_scroll.saturating_add(10);
+                    self.scroll_tail(-10);
                 }
                 KeyAction::None
             }
             Key::PageDown => {
                 if self.current() == Tab::Logs {
-                    self.tail_scroll = self.tail_scroll.saturating_sub(10);
+                    self.scroll_tail(10);
                 }
                 KeyAction::None
             }
@@ -647,7 +656,6 @@ impl App {
     }
 
     fn move_cursor(&mut self, delta: i32) {
-        self.tail_scroll = 0;
         match self.current() {
             Tab::Settings => {
                 let n = setting_rows().len() as i32;
@@ -662,11 +670,11 @@ impl App {
                 }
             }
             Tab::Logs => {
-                self.tail_scroll = 0;
                 let i = self.logs_state.selected().unwrap_or(0) as i32 + delta;
                 let max = self.logs.len().saturating_sub(1) as i32;
                 if max >= 0 {
                     self.logs_state.select(Some(i.clamp(0, max) as usize));
+                    self.tail_follow = true;
                 }
             }
             _ => {}
@@ -674,6 +682,10 @@ impl App {
     }
 
     fn nudge(&mut self, right: bool) {
+        if self.current() == Tab::Logs {
+            self.scroll_tail(if right { 10 } else { -10 });
+            return;
+        }
         if self.current() != Tab::Settings {
             return;
         }
@@ -715,7 +727,7 @@ impl App {
             }
             Some(Action::LogRow(i)) => {
                 self.logs_state.select(Some(i));
-                self.tail_scroll = 0;
+                self.tail_follow = true;
                 KeyAction::None
             }
             Some(Action::FlagRow(i)) => {
@@ -1002,9 +1014,18 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
 }
 
 fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
+    // File list sized to its longest name instead of a fixed split.
+    let widest = app
+        .logs
+        .iter()
+        .map(|p| p.file_name().map(|n| n.to_string_lossy().len()).unwrap_or(0))
+        .max()
+        .unwrap_or(20)
+        .clamp(18, 40) as u16
+        + 4;
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
+        .constraints([Constraint::Length(widest), Constraint::Min(0)])
         .split(area);
     let items: Vec<ListItem> = app
         .logs
@@ -1027,22 +1048,26 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
         chunks[0],
         &mut app.logs_state,
     );
-    let tail = app
+    let text = app
         .logs_state
         .selected()
         .and_then(|i| app.logs.get(i))
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .map(|text| {
-            let lines: Vec<&str> = text.lines().collect();
-            let n = lines.len();
-            lines[n.saturating_sub(400)..].join("\n")
-        })
         .unwrap_or_default();
+    let total = text.lines().count();
+    // Visible rows minus borders; follow mode pins to the bottom.
+    let visible = chunks[1].height.saturating_sub(2) as usize;
+    app.tail_max = total.saturating_sub(visible);
+    if app.tail_follow {
+        app.tail_scroll = app.tail_max.min(u16::MAX as usize) as u16;
+    } else {
+        app.tail_scroll = app.tail_scroll.min(app.tail_max.min(u16::MAX as usize) as u16);
+    }
     f.render_widget(
-        Paragraph::new(tail)
+        Paragraph::new(text)
             .wrap(ratatui::widgets::Wrap { trim: true })
             .scroll((app.tail_scroll, 0))
-            .block(title_block(pal, "Tail (PgUp/PgDn/wheel)")),
+            .block(title_block(pal, "Tail (PgUp/PgDn/wheel/arrows)")),
         chunks[1],
     );
 }
