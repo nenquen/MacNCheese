@@ -387,6 +387,10 @@ class GameLogsView(Gtk.Box):
             self.reset(log_path)
 
         try:
+            size = log_path.stat().st_size
+            if size < self.last_pos:
+                # Rotated or truncated underneath us: start over.
+                self.reset(log_path)
             with open(log_path, "rb") as f:
                 f.seek(self.last_pos)
                 chunk = f.read()
@@ -407,8 +411,8 @@ class GameLogsView(Gtk.Box):
                     if self.auto_scroll:
                         end_mark = self.buffer.create_mark("end", self.buffer.get_end_iter(), False)
                         self.text_view.scroll_to_mark(end_mark, 0.0, False, 0.0, 1.0)
-        except Exception:
-            pass
+        except OSError as error:
+            print(f"Log view failed for {log_path}: {error}")
 
     def _on_scroll_toggled(self, btn):
         self.auto_scroll = btn.get_active()
@@ -513,14 +517,10 @@ class PlayPage(Adw.Bin):
             _toast(self.window.toasts, _("No log found"))
             return
         self.top_box.set_visible(True)
-        child = self.switcher.get_first_child()
-        idx = 0
-        while child:
-            if idx == 1:
-                child.set_sensitive(True)
-                child.set_tooltip_text(_("View game logs"))
-            child = child.get_next_sibling()
-            idx += 1
+        logs_button = self.switcher.get_child_by_name("logs")
+        if logs_button is not None:
+            logs_button.set_sensitive(True)
+            logs_button.set_tooltip_text(_("View game logs"))
         self.logs_view.reset(log_path)
         self.logs_view.update()
         self.stack.set_visible_child_name("logs")
@@ -547,17 +547,13 @@ class PlayPage(Adw.Bin):
         # Show switcher when game is active or currently viewing logs
         self.top_box.set_visible(active or viewing_logs)
 
-        child = self.switcher.get_first_child()
-        idx = 0
-        while child:
-            if idx == 1:
-                child.set_sensitive(active or bool(self.window.last_log))
-                if not active and not self.window.last_log:
-                    child.set_tooltip_text(_("Game is not running"))
-                else:
-                    child.set_tooltip_text(_("View game logs"))
-            child = child.get_next_sibling()
-            idx += 1
+        logs_button = self.switcher.get_child_by_name("logs")
+        if logs_button is not None:
+            logs_button.set_sensitive(active or bool(self.window.last_log))
+            if not active and not self.window.last_log:
+                logs_button.set_tooltip_text(_("Game is not running"))
+            else:
+                logs_button.set_tooltip_text(_("View game logs"))
 
         if not active and not self.window.last_log and viewing_logs:
             self.stack.set_visible_child_name("play")
@@ -886,10 +882,13 @@ class FlagsPage(Adw.PreferencesPage):
         def on_response(d, res):
             if res == Gtk.ResponseType.ACCEPT:
                 file = d.get_file()
-                if file:
+                path = file.get_path() if file else None
+                if not path:
+                    _toast(self.window.toasts, _("Could not use that location"))
+                else:
                     try:
-                        Path(file.get_path()).write_text(text, encoding="utf-8")
-                        _toast(self.window.toasts, _("Flags saved to {path}", path=Path(file.get_path()).name))
+                        Path(path).write_text(text, encoding="utf-8")
+                        _toast(self.window.toasts, _("Flags saved to {path}", path=Path(path).name))
                     except OSError as e:
                         _error_dialog(self.window, _("Could not save flags"), str(e))
             d.destroy()
@@ -1058,8 +1057,10 @@ class SettingsPage(Adw.Bin):
             title=_("Follow system light/dark mode"),
             subtitle=_("KDE and GNOME switches apply live. Turn off to keep Adwaita default."),
             active=settings.get("follow_system_theme", True))
-        follow_theme.connect("notify::active", lambda row, _pspec: window.set_setting(
-            "follow_system_theme", row.get_active()))
+        def _follow_theme_changed(row, _pspec):
+            window.set_setting("follow_system_theme", row.get_active())
+            window.get_application()._apply_desktop_integration()
+        follow_theme.connect("notify::active", _follow_theme_changed)
         game.add(follow_theme)
 
         system_font = Adw.SwitchRow(
@@ -1680,6 +1681,14 @@ class InfoPage(Adw.PreferencesPage):
         about = Adw.PreferencesGroup(title="Mac'n Cheese", description=_(ABOUT))
         self.add(about)
 
+        setup_row = Adw.ActionRow(title=_("Setup guide"), activatable=True,
+                                 subtitle=_("Reinstall Roblox or fix a broken install"))
+        setup_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        setup_row.connect("activated", lambda *_args: window.show_setup())
+        setup_group = Adw.PreferencesGroup()
+        setup_group.add(setup_row)
+        self.add(setup_group)
+
         made_by = Adw.PreferencesGroup(title=_("Authors"))
         self.avatar = Adw.Avatar(size=48, text=author.NAME, show_initials=True)
         profile = Adw.ActionRow(title=author.NAME, activatable=True,
@@ -1709,8 +1718,8 @@ class InfoPage(Adw.PreferencesPage):
         ui_contributor.connect("activated", lambda *_args: _open_uri(window, author.UI_CONTRIBUTOR_URL))
         made_by.add(ui_contributor)
 
-        claude = Adw.ActionRow(title=_("Assisted with Claude Opus 5.5"), activatable=True,
-                               subtitle=_("Anthropic's AI assisted writing the code together with the authors"))
+        claude = Adw.ActionRow(title=_("Made with Claude Opus 5.5"), activatable=True,
+                               subtitle=_("Anthropic's AI wrote the code together with the authors"))
         claude.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
         claude.connect("activated", lambda *_args: _open_uri(window, "https://www.anthropic.com/claude"))
         made_by.add(claude)
@@ -1911,8 +1920,8 @@ class ModsPage(Adw.Bin):
         def on_response(d, res):
             if res == Gtk.ResponseType.ACCEPT:
                 file = d.get_file()
-                if file:
-                    path = file.get_path()
+                path = file.get_path() if file else None
+                if path:
                     self.window.set_setting("mod_custom_death_sound", path)
                     self.custom_death_row.set_subtitle(path)
             d.destroy()
@@ -1936,8 +1945,8 @@ class ModsPage(Adw.Bin):
         def on_response(d, res):
             if res == Gtk.ResponseType.ACCEPT:
                 file = d.get_file()
-                if file:
-                    path = file.get_path()
+                path = file.get_path() if file else None
+                if path:
                     self.window.set_setting("mod_custom_cursor", path)
                     self.custom_cursor_row.set_subtitle(path)
             d.destroy()
@@ -1962,8 +1971,8 @@ class ModsPage(Adw.Bin):
         def on_response(d, res):
             if res == Gtk.ResponseType.ACCEPT:
                 file = d.get_file()
-                if file:
-                    path = file.get_path()
+                path = file.get_path() if file else None
+                if path:
                     self.window.set_setting("mod_custom_font", path)
                     self.font_row.set_subtitle(Path(path).name)
             d.destroy()
@@ -1978,10 +1987,13 @@ class ModsPage(Adw.Bin):
     def _open_mods_folder(self):
         folder = mods.ensure_mods_dir()
         try:
-            Gio.AppInfo.launch_default_for_uri(folder.as_uri(), None)
-        except Exception:
-            import subprocess
-            subprocess.Popen(["xdg-open", str(folder)])
+            try:
+                Gio.AppInfo.launch_default_for_uri(folder.as_uri(), None)
+            except Exception:
+                import subprocess
+                subprocess.Popen(["xdg-open", str(folder)])
+        except Exception as error:
+            _toast(self.window.toasts, _("Could not open {folder}: {error}", folder=str(folder), error=error))
 
     def _apply_mods_now(self):
         try:
@@ -2016,11 +2028,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.last_log = self._find_last_log()
         self.pending_uri = None
         self.setup_active = False
-        setup_action = Gio.SimpleAction.new("setup", None)
-        setup_action.connect("activate", lambda *_args: self.show_setup())
-        self.add_action(setup_action)
-        # MACNCHEESE_PAGE opens another tab first (for screenshots).
-        self.build(os.environ.get("MACNCHEESE_PAGE", "play"))
+        page = os.environ.get("MACNCHEESE_PAGE", "play")
+        if page not in ("play", "settings", "mods", "info", "flags", "env", "roblox"):
+            print(f"Ignoring unknown MACNCHEESE_PAGE={page!r}, opening play")
+            page = "play"
+        self.build(page)
         if not self.setup_active:
             threading.Thread(target=self._check_startup_update, daemon=True).start()
 
@@ -2071,10 +2083,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         content_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         header.set_title_widget(Gtk.Label(label=""))
-        menu = Gio.Menu()
-        menu.append(_("Setup guide"), "win.setup")
-        header.pack_start(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
-                                       tooltip_text=_("Launcher menu")))
 
         content_view.add_top_bar(header)
         self.toasts.set_child(self.stack)
@@ -2454,13 +2462,15 @@ class LauncherWindow(Adw.ApplicationWindow):
             self.pending_uri = pending
             GLib.idle_add(self.handle_uri, pending)
         failed = status not in (0, -1)
+        stopping = getattr(self, "stopping", False)
+        self.stopping = False
         # A failure is always shown, even with the launcher set to stay closed.
         if failed or self.settings.get("show_launcher_after_exit", True):
             self.set_visible(True)
             self.present()
         else:
             self.get_application().quit()
-        if failed:
+        if failed and not stopping:
             reason = core.exit_reason(self.last_log)
             if reason == "captcha":
                 self._captcha_dialog()
@@ -2500,12 +2510,18 @@ class LauncherWindow(Adw.ApplicationWindow):
             )
 
     def stop(self):
+        self.stopping = True
         threading.Thread(target=core.stop_roblox, daemon=True).start()
 
     def _find_last_log(self):
         if not core.LOGS.exists():
             return None
-        logs = sorted(core.LOGS.glob("launch-*.log"), key=lambda p: p.stat().st_mtime)
+        try:
+            logs = sorted(core.LOGS.glob("launch-*.log"),
+                          key=lambda p: p.stat().st_mtime)
+        except OSError:
+            return None
+        logs = [p for p in logs if p.is_file()]
         return logs[-1] if logs else None
 
     def open_last_log(self):
@@ -2561,18 +2577,21 @@ class LauncherApp(Adw.Application):
         except Exception:
             settings = {}
         manager = Adw.StyleManager.get_default()
-        if settings.get("follow_system_theme", True):
-            scheme = desktop.system_color_scheme()
+
+        def apply_scheme(scheme):
             manager.set_color_scheme(
                 Adw.ColorScheme.FORCE_DARK if scheme == "dark"
                 else Adw.ColorScheme.FORCE_LIGHT if scheme == "light"
                 else Adw.ColorScheme.DEFAULT)
-            desktop.watch_color_scheme(
-                lambda s: manager.set_color_scheme(
-                    Adw.ColorScheme.FORCE_DARK if s == "dark"
-                    else Adw.ColorScheme.FORCE_LIGHT if s == "light"
-                    else Adw.ColorScheme.DEFAULT)
-                if settings.get("follow_system_theme", True) else None)
+
+        if settings.get("follow_system_theme", True):
+            apply_scheme(desktop.system_color_scheme())
+            if not getattr(self, "_theme_watcher", False):
+                self._theme_watcher = desktop.watch_color_scheme(
+                    lambda s: apply_scheme(s)
+                    if core.load_settings().get("follow_system_theme", True) else None)
+        else:
+            apply_scheme(None)
         if settings.get("use_system_font", True):
             detected = desktop.system_font()
             if detected:

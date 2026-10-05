@@ -110,7 +110,6 @@ RU = {
     "Forward": "Вперёд",
     "Reload": "Обновить",
     "Back to Roblox": "Вернуться в Roblox",
-    "Close": "Закрыть",
     "OK": "Понятно",
     "Install": "Установить",
     "{label}: {done} of {total} MB": "{label}: {done} из {total} МБ",
@@ -296,7 +295,6 @@ RU = {
     "Error applying mods": "Ошибка применения модов",
     "Error resetting mods": "Ошибка сброса модов",
     # Settings: account
-    "Account": "Аккаунт",
     "Sign out": "Выйти из аккаунта",
     "Sign out?": "Выйти из аккаунта?",
     "The saved Roblox session will be deleted, you will need to sign in again next time.":
@@ -389,6 +387,17 @@ RU = {
     "Maintains this version: stability and performance fixes":
         "Поддерживает эту версию: стабильность и скорость",
     "Made with Claude Opus 5.5": "Сделано с Claude Opus 5.5",
+    "Window backend": "Фон окна",
+    "Native Wayland is experimental and incomplete. Applies on next launch.": "Нативный Wayland экспериментален и не завершён. Применяется при следующем запуске.",
+    "X11 / Xwayland": "X11 / Xwayland",
+    "Native Wayland (experimental)": "Нативный Wayland (экспериментально)",
+    "Checking…": "Проверка…",
+    "MSAA": "MSAA",
+    "Reinstall Roblox or fix a broken install": "Переустановить Roblox или починить установку",
+    "Setup guide": "Руководство по установке",
+    "Could not use that location": "Не удалось использовать это место",
+    "Could not open {folder}: {error}": "Не удалось открыть {folder}: {error}",
+
     "Anthropic's AI wrote the code together with the authors": "ИИ от Anthropic писал код вместе с авторами",
     "Follow system light/dark mode": "Следовать системной теме",
     "KDE and GNOME switches apply live. Turn off to keep Adwaita default.": "Переключения KDE и GNOME применяются сразу. Отключите, чтобы оставить Adwaita.",
