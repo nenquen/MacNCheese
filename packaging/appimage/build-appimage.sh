@@ -25,7 +25,7 @@ fetch() { # fetch <url> <file>
 echo "==> fetching sharun toolchain"
 fetch https://github.com/VHSgunzo/sharun/releases/latest/download/sharun-x86_64 sharun
 fetch https://raw.githubusercontent.com/pkgforge-dev/AnyLinux-AppImages/main/useful-tools/quick-sharun.sh quick-sharun.sh
-fetch https://github.com/VHSgunzo/uruntime/releases/latest/download/uruntime-x86_64 uruntime
+fetch https://github.com/VHSgunzo/uruntime/releases/latest/download/uruntime-appimage-x86_64 uruntime
 
 echo "==> staging AppDir"
 rm -rf -- "$APPDIR"
@@ -48,7 +48,38 @@ exec python3 "$APPIMAGE_SHARE/launcher/macncheese-launcher" "$@"
 LAUNCHER
 chmod +x -- "$APPDIR/usr/bin/macncheese"
 
+echo "==> desktop integration"
+sed "s|^Exec=.*|Exec=macncheese %u|; s|^Icon=.*|Icon=macncheese|" \
+  "$REPO_ROOT/packaging/org.macncheese.MacNCheese.desktop" \
+  > "$APPDIR/org.macncheese.MacNCheese.desktop"
+cp -- "$REPO_ROOT/branding/icons/macncheese-256.png" "$APPDIR/macncheese.png"
+# AppRun is a real file (not a symlink): readlink -f on a symlink would
+# resolve into usr/bin and double the share path at runtime.
+cat > "$APPDIR/AppRun" <<'APPRUN'
+#!/bin/sh
+HERE=$(dirname "$0")
+case "$HERE" in
+  /*) ;;
+  *) HERE="$PWD/$HERE" ;;
+esac
+export APPDIR="$HERE"
+export LD_LIBRARY_PATH="$HERE/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export GI_TYPELIB_PATH="$HERE/lib/girepository-1.0"
+export GSETTINGS_SCHEMA_DIR="$HERE/share/glib-2.0/schemas"
+export GIO_MODULE_DIR="$HERE/lib/gio/modules"
+export PYTHONPATH="$HERE/lib/python3.14/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export XDG_DATA_DIRS="$HERE/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+if [ -z "${DARLING_SYSROOT:-}" ] && [ ! -d /usr/libexec/darling ] && [ ! -d /usr/local/libexec/darling ]; then
+  echo "Mac'n Cheese AppImage needs Darling on the system." >&2
+  echo "Install it first: https://github.com/nenquen/MacNCheese#install" >&2
+  exit 1
+fi
+exec python3 "$HERE/usr/share/macncheese/launcher/macncheese-launcher" "$@"
+APPRUN
+chmod +x -- "$APPDIR/AppRun"
+
 echo "==> deploying dependencies with sharun (strace mode)"
+export DISPLAY="${DISPLAY:-:0}"
 ./quick-sharun.sh "$APPDIR/usr/bin/macncheese" -- --help
 
 echo "==> removing host-owned GPU stack from the bundle"
@@ -58,15 +89,11 @@ find "$APPDIR" \( -path "*/dri/*" \
   -o -name "libGL*" -o -name "libEGL*" -o -name "libGLES*" \
   -o -name "libvulkan*" -o -name "*.icd.json" \) -delete || true
 
-echo "==> desktop integration"
-sed "s|^Exec=.*|Exec=macncheese %u|; s|^Icon=.*|Icon=macncheese|" \
-  "$REPO_ROOT/packaging/org.macncheese.MacNCheese.desktop" \
-  > "$APPDIR/org.macncheese.MacNCheese.desktop"
-cp -- "$REPO_ROOT/branding/icons/macncheese-256.png" "$APPDIR/macncheese.png"
-ln -sf usr/bin/macncheese "$APPDIR/AppRun"
-
-echo "==> packing with uruntime"
-./uruntime --appdir "$APPDIR" --output "$OUT"
+echo "==> packing with uruntime (squashfs + append)"
+./uruntime --uruntime-mksquashfs "$APPDIR" "$WORK/macncheese.squashfs" -comp zstd -b 1M
+cat ./uruntime "$WORK/macncheese.squashfs" > "$OUT"
+chmod +x -- "$OUT"
+rm -f -- "$WORK/macncheese.squashfs"
 
 if [[ $RUN_TEST == 1 ]]; then
   echo "==> smoke test"
