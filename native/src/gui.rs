@@ -231,6 +231,17 @@ impl ApplicationHandler for Gui {
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor = (position.x as f32, position.y as f32);
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                use winit::event::MouseScrollDelta;
+                let up = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y > 0.0,
+                    MouseScrollDelta::PixelDelta(pos) => pos.y < 0.0,
+                };
+                let action =
+                    self.app.on_input(if up { Input::WheelUp } else { Input::WheelDown });
+                self.handle(action, el);
+                self.redraw();
+            }
             WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
                 let (col, row) = self.click_cell();
                 if std::env::var("MACNCHEESE_CLICK_DEBUG").is_ok() {

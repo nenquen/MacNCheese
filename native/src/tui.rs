@@ -32,8 +32,11 @@ fn to_input(event: Event) -> Option<Input> {
             };
             Some(Input::Key(k))
         }
-        Event::Mouse(mouse) if mouse.kind == MouseEventKind::Down(MouseButton::Left) => {
-            Some(Input::Click(mouse.column, mouse.row))
+        Event::Mouse(mouse) => match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => Some(Input::Click(mouse.column, mouse.row)),
+            MouseEventKind::ScrollUp => Some(Input::WheelUp),
+            MouseEventKind::ScrollDown => Some(Input::WheelDown),
+            _ => None,
         }
         _ => None,
     }

@@ -109,7 +109,6 @@ pub struct App {
 
 #[derive(Clone)]
 enum FlagRow {
-    Preset { key: &'static str, title: &'static str, label: String },
     Custom { key: String, value: String },
     Add,
 }
@@ -407,6 +406,25 @@ impl App {
         match input {
             Input::Key(key) => self.on_key(key),
             Input::Click(column, row) => self.on_click(column, row),
+            Input::WheelUp => {
+                self.wheel(-1);
+                KeyAction::None
+            }
+            Input::WheelDown => {
+                self.wheel(1);
+                KeyAction::None
+            }
+        }
+    }
+
+    /// Mouse wheel: lists move, log tail scrolls.
+    fn wheel(&mut self, delta: i32) {
+        match self.current() {
+            Tab::Settings | Tab::Flags => self.move_cursor(delta * 3),
+            Tab::Logs => {
+                self.tail_scroll = self.tail_scroll.saturating_add_signed((-delta * 5) as i16);
+            }
+            _ => {}
         }
     }
 
@@ -513,48 +531,24 @@ impl App {
         }
     }
 
-    /// Fishstrap-style presets: FPS cap cycle + post-FX toggle.
-    fn preset_rows() -> Vec<(&'static str, &'static str, Vec<(String, String)>)> {
-        vec![
-            ("DFIntTaskSchedulerTargetFps", "FPS cap", vec![
-                ("60".into(), "60".into()), ("120".into(), "120".into()),
-                ("144".into(), "144".into()), ("240".into(), "240".into()),
-                ("0".into(), "Unlimited".into()),
-            ]),
-            ("FFlagDisablePostFx", "Disable post effects", vec![
-                ("True".into(), "on".into()), ("False".into(), "off".into()),
-            ]),
-        ]
-    }
-
-    fn known_keys() -> Vec<&'static str> {
-        Self::preset_rows().into_iter().map(|(k, _, _)| k).collect()
-    }
-
     fn custom_flags(&self) -> Vec<(String, String)> {
+        // No built-in presets: users research and add their own flags.
         let flags = crate::flags::load();
-        let known = Self::known_keys();
         let mut out: Vec<(String, String)> = flags
             .iter()
-            .filter(|(k, _)| !known.contains(&k.as_str()))
             .map(|(k, v)| (k.clone(), crate::flags::display_value(v)))
             .collect();
         out.sort();
         out
     }
 
-    /// Selectable rows: presets, customs, [+ Add].
+    /// Selectable rows: customs, [+ Add].
     fn flag_rows(&self) -> Vec<FlagRow> {
-        let flags = crate::flags::load();
-        let mut rows = vec![];
-        for (key, title, options) in Self::preset_rows() {
-            let cur = flags.get(key).and_then(|v| v.as_str()).unwrap_or("");
-            let label = options.iter().find(|(v, _)| *v == cur).map(|(_, l)| l.clone()).unwrap_or_else(|| cur.to_string());
-            rows.push(FlagRow::Preset { key, title, label });
-        }
-        for (key, value) in self.custom_flags() {
-            rows.push(FlagRow::Custom { key, value });
-        }
+        let mut rows: Vec<FlagRow> = self
+            .custom_flags()
+            .into_iter()
+            .map(|(key, value)| FlagRow::Custom { key, value })
+            .collect();
         rows.push(FlagRow::Add);
         rows
     }
@@ -574,14 +568,6 @@ impl App {
     fn activate_flag(&mut self) {
         let rows = self.flag_rows();
         match rows.get(self.flags_cursor) {
-            Some(FlagRow::Preset { key, .. }) => {
-                let flags = crate::flags::load();
-                let cur = flags.get(*key).and_then(|v| v.as_str()).unwrap_or("");
-                let opts = Self::preset_rows().into_iter().find(|(k, _, _)| *k == *key).map(|(_, _, o)| o).unwrap_or_default();
-                let i = opts.iter().position(|(v, _)| *v == cur).unwrap_or(0);
-                let next = opts[(i + 1) % opts.len()].0.clone();
-                self.save_flag(key, &next);
-            }
             Some(FlagRow::Custom { key, value }) => {
                 self.flag_edit = Some(FlagEdit::value(key.clone(), value.clone()));
             }
@@ -737,6 +723,8 @@ pub enum Key {
 pub enum Input {
     Key(Key),
     Click(u16, u16),
+    WheelUp,
+    WheelDown,
 }
 
 fn app_uri() -> Option<String> {
@@ -919,9 +907,8 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
                 Style::default().fg(pal.fg)
             };
             let text = match row {
-                FlagRow::Preset { title, label, .. } => format!("{title}: {label}"),
                 FlagRow::Custom { key, value } => format!("{key} = {value}"),
-                FlagRow::Add => "[+] Add flag (a) · Enter toggles · d deletes custom".to_string(),
+                FlagRow::Add => "[+] Add flag (a) · Enter edits · d deletes".to_string(),
             };
             app.clicks.push((
                 Rect::new(chunks[0].x + 1, chunks[0].y + 1 + i as u16, chunks[0].width.saturating_sub(2), 1),
