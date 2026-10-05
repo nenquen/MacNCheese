@@ -1197,8 +1197,6 @@ extern int getaddrinfo(const char*, const char*, const void*, void**);
 extern int res_9_query(const char*, int, int, unsigned char*, int);
 extern int *__error(void);
 extern void macncheese_sleep_us(unsigned int);
-extern int macncheese_dns_resolve(const char* node, const char* service,
-                                const void* hints, void** result);
 static const struct macncheese_resolver_api *macncheese_resolver_functions(void) {
     static struct macncheese_resolver_api api;
     static volatile unsigned int ready, initialization_lock;
@@ -1272,14 +1270,7 @@ static int macncheese_getaddrinfo(const char* node, const char* service,
         return 8; /* EAI_NONAME */
     }
     long started = macncheese_millis();
-    // DNS chosen in the launcher, for Roblox only (dns_override.c).
-    int own = macncheese_dns_resolve(node, service, hints, result);
-    if (own >= 0) {
-        long took = macncheese_millis() - started;
-        if (took > 200)
-            macncheese_dns_trace(node, service, hints, 0, own, 0, took);
-        return own;
-    }
+    // System resolver only (Sober-simple): no per-app DNS forwarder.
     int (*real_getaddrinfo)(const char*, const char*, const void*, void**) =
         MACNCHEESE_NEXT(int (*)(const char*, const char*, const void*, void**), "getaddrinfo");
 

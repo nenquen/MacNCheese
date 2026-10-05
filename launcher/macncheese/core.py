@@ -92,8 +92,6 @@ DEFAULT_SETTINGS = {
     "hide_menu_bar": True,
     "renderer": "opengl",
     "mangohud": False,
-    "dns": "system",
-    "dns_custom": "",
     "show_launcher_after_exit": True,
     "diagnostic_signals": False,
     "trace_udp": False,
@@ -1721,7 +1719,6 @@ class RobloxSession:
         self.gone_since = None
         self.game_pids = []
         self.scanned_at = 0.0
-        self.dns = None
         self.audio = None
         # The launcher's browser window for Roblox's embedded pages (web.py):
         # its socket as the guest sees it, and WebKit's user agent.
@@ -1787,8 +1784,6 @@ class RobloxSession:
             variables.append(f"MACNCHEESE_WEB_SOCKET={self.web_socket}")
             if self.web_user_agent:
                 variables.append(f"MACNCHEESE_WEB_USER_AGENT={self.web_user_agent}")
-        if self.dns:
-            variables.append(f"MACNCHEESE_DNS={self.dns.address}")
         if self.audio:
             variables.append(f"MACNCHEESE_AUDIO_FIFO=/Volumes/SystemRoot{self.audio.fifo}")
             variables.append(f"MACNCHEESE_AUDIO_INPUT_FIFO=/Volumes/SystemRoot{self.audio.input_fifo}")
@@ -1873,11 +1868,6 @@ class RobloxSession:
             mark_client_patches()
             patches_note = "client binary patches verified"
         patches_took = time.monotonic() - phase_started
-        provider = self.settings.get("dns", "system")
-        if provider != "system" and (provider != "custom" or self.settings.get("dns_custom")):
-            from .dns import DnsForwarder, warmup as dns_warmup
-            self.dns = DnsForwarder(provider, self.settings.get("dns_custom", ""))
-            dns_warmup(provider, self.settings.get("dns_custom", ""))
         self.audio = HostAudio.start()
         clear_stale_darling()
         phase_started = time.monotonic()
@@ -1976,9 +1966,6 @@ class RobloxSession:
             _terminate_roblox(leftover, wait=1)
         if self.process and self.process.poll() is None:
             _terminate_frontend(self.process)
-        if self.dns:
-            self.dns.stop()
-            self.dns = None
         if self.audio:
             self.audio.stop()
             self.audio = None

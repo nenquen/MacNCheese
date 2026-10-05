@@ -13,7 +13,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from . import __version__, author, core, discord, dns, i18n, mods, uri as uri_handoff  # noqa: E402
+from . import __version__, author, core, discord, i18n, mods, uri as uri_handoff  # noqa: E402
 from .i18n import _  # noqa: E402
 from .setup import SetupWizard  # noqa: E402
 
@@ -50,13 +50,6 @@ PRESETS = [
      "flag": "FIntDebugTextureManagerSkipMips", "kind": "number", "default": -1, "min": -1, "max": 0},
 ]
 
-DNS_CHOICES = [
-    ("system", "System (Darling default)"),
-    ("quad9", "Quad9 (9.9.9.9, encrypted)"),
-    ("cloudflare", "Cloudflare (1.1.1.1, encrypted)"),
-    ("google", "Google (8.8.8.8, encrypted)"),
-    ("custom", "Custom"),
-]
 
 
 def _toast(overlay, text):
@@ -1164,43 +1157,6 @@ class SettingsPage(Adw.Bin):
         discord_group.add(self.discord_time)
 
         self.env_page.add(discord_group)
-
-        dns_group = Adw.PreferencesGroup(
-            title=_("DNS for Roblox"),
-            description=_("Only Roblox uses this server, the rest of the system keeps its own DNS. "
-                          "Helps when some Roblox images or servers do not load."))
-        dns_codes = [code for code, _label in DNS_CHOICES]
-        server = Adw.ComboRow(title=_("DNS server"),
-                              model=Gtk.StringList.new([_(label) for _code, label in DNS_CHOICES]))
-        current = settings.get("dns", "system")
-        server.set_selected(dns_codes.index(current) if current in dns_codes else 0)
-        custom = Adw.EntryRow(title=_("Custom server"))
-        custom.set_text(settings.get("dns_custom", ""))
-        custom.set_show_apply_button(True)
-        custom.set_tooltip_text(_("IP address, optionally with :port. Plain DNS, not encrypted."))
-        custom.set_visible(current == "custom")
-
-        def dns_changed(row, _pspec):
-            code = dns_codes[row.get_selected()]
-            window.set_setting("dns", code)
-            custom.set_visible(code == "custom")
-
-        def custom_applied(row):
-            text = row.get_text().strip()
-            try:
-                dns.parse_server(text)
-            except ValueError as error:
-                row.add_css_class("error")
-                _toast(window.toasts, str(error))
-                return
-            row.remove_css_class("error")
-            window.set_setting("dns_custom", text)
-
-        server.connect("notify::selected", dns_changed)
-        custom.connect("apply", custom_applied)
-        dns_group.add(server)
-        dns_group.add(custom)
-        self.env_page.add(dns_group)
 
         diagnostics = Adw.PreferencesGroup(
             title=_("Diagnostics"),

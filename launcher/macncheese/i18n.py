@@ -197,23 +197,6 @@ RU = {
     "Hide the macOS menu bar": "Скрывать полоску меню macOS",
     "The Roblox, Edit, Window… strip at the top of the game window":
         "Полоска Roblox, Edit, Window… сверху окна игры",
-    # Settings: DNS
-    "DNS for Roblox": "DNS для Roblox",
-    "Only Roblox uses this server, the rest of the system keeps its own DNS. "
-    "Helps when some Roblox images or servers do not load.":
-        "Этот сервер использует только Roblox, остальная система остаётся на своём DNS. "
-        "Помогает, если не грузятся картинки или сервера Roblox.",
-    "DNS server": "DNS-сервер",
-    "System (Darling default)": "Системный (как в Darling)",
-    "Quad9 (9.9.9.9, encrypted)": "Quad9 (9.9.9.9, шифрованный)",
-    "Cloudflare (1.1.1.1, encrypted)": "Cloudflare (1.1.1.1, шифрованный)",
-    "Google (8.8.8.8, encrypted)": "Google (8.8.8.8, шифрованный)",
-    "Custom": "Свой",
-    "Custom server": "Свой сервер",
-    "IP address, optionally with :port. Plain DNS, not encrypted.":
-        "IP-адрес, можно с :портом. Обычный DNS, без шифрования.",
-    "Custom DNS server must look like 9.9.9.9, 9.9.9.9:53 or [2620:fe::fe]:53":
-        "Свой DNS-сервер пишется так: 9.9.9.9, 9.9.9.9:53 или [2620:fe::fe]:53",
     # Settings: language
     "Interface": "Интерфейс",
     "Language": "Язык",

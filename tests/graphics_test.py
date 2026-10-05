@@ -258,7 +258,7 @@ class GraphicsTests(unittest.TestCase):
     def test_renderer_reaches_guest_and_nvidia_cache_uses_host_path(self):
         session = object.__new__(core.RobloxSession)
         session.settings = dict(core.DEFAULT_SETTINGS, renderer="vulkan")
-        session.web_socket = session.dns = session.audio = None
+        session.web_socket = session.audio = None
         with patch.object(graphics.Path, "is_file", return_value=True), \
                 patch.object(core, "host_vram_bytes", return_value=0), \
                 patch.dict(core.os.environ, {"MANGOHUD": "1", "MANGOHUD_CONFIG": "fps,frametime,gpu_name", "MANGOHUD_CONFIGFILE": "/tmp/hud config.conf"}), \
@@ -299,7 +299,7 @@ class GraphicsTests(unittest.TestCase):
     def test_mangohud_toggle_reaches_host_and_guest(self):
         session = object.__new__(core.RobloxSession)
         session.settings = dict(core.DEFAULT_SETTINGS, mangohud=True)
-        session.web_socket = session.dns = session.audio = None
+        session.web_socket = session.audio = None
         with patch.dict(core.os.environ, {}, clear=True), \
                 patch.object(graphics.Path, "is_file", return_value=True), \
                 patch.object(core, "host_vram_bytes", return_value=0), \

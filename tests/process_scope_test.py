@@ -210,7 +210,7 @@ class ProcessScopeTests(unittest.TestCase):
     def test_session_finish_uses_scoped_roblox_and_owned_frontend_cleanup(self):
         session=object.__new__(core.RobloxSession)
         session.process=Mock();session.process.poll.return_value=None
-        session.dns=None;session.audio=None
+        session.audio=None
         with patch.object(core,"roblox_pids",return_value=[1]), \
                 patch.object(core,"_terminate_roblox") as terminate, \
                 patch.object(core,"_terminate_frontend") as frontend:
