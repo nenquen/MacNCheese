@@ -8,6 +8,7 @@ use ratatui::style::Color;
 #[derive(Clone)]
 pub struct Palette {
     pub bg: Color,
+    pub raised: Color,
     pub fg: Color,
     pub accent: Color,
     pub dim: Color,
@@ -25,6 +26,7 @@ fn rgb(hex: &str) -> Color {
 
 pub static DARK: Palette = Palette {
     bg: Color::Black,
+    raised: Color::Rgb(26, 26, 26),
     fg: Color::White,
     accent: Color::Yellow,
     dim: Color::DarkGray,
@@ -35,7 +37,8 @@ pub static DARK: Palette = Palette {
 };
 
 pub static CATPPUCCIN: Palette = Palette {
-    bg: Color::Rgb(30, 30, 46),
+    bg: Color::Rgb(24, 24, 37),
+    raised: Color::Rgb(49, 50, 68),
     fg: Color::Rgb(205, 214, 244),
     accent: Color::Rgb(203, 166, 247),
     dim: Color::Rgb(108, 112, 134),
@@ -47,6 +50,7 @@ pub static CATPPUCCIN: Palette = Palette {
 
 pub static ROSE_PINE: Palette = Palette {
     bg: Color::Rgb(25, 23, 36),
+    raised: Color::Rgb(31, 29, 46),
     fg: Color::Rgb(224, 222, 244),
     accent: Color::Rgb(196, 167, 231),
     dim: Color::Rgb(110, 106, 134),
@@ -58,6 +62,7 @@ pub static ROSE_PINE: Palette = Palette {
 
 pub static TOKYONIGHT: Palette = Palette {
     bg: Color::Rgb(26, 27, 38),
+    raised: Color::Rgb(36, 40, 59),
     fg: Color::Rgb(192, 202, 245),
     accent: Color::Rgb(122, 162, 247),
     dim: Color::Rgb(86, 95, 137),
@@ -69,6 +74,7 @@ pub static TOKYONIGHT: Palette = Palette {
 
 pub static NORD: Palette = Palette {
     bg: Color::Rgb(46, 52, 64),
+    raised: Color::Rgb(59, 66, 82),
     fg: Color::Rgb(216, 222, 233),
     accent: Color::Rgb(136, 192, 208),
     dim: Color::Rgb(76, 86, 106),
@@ -80,6 +86,7 @@ pub static NORD: Palette = Palette {
 
 pub static GRUVBOX: Palette = Palette {
     bg: Color::Rgb(40, 40, 40),
+    raised: Color::Rgb(60, 56, 54),
     fg: Color::Rgb(235, 219, 178),
     accent: Color::Rgb(250, 189, 47),
     dim: Color::Rgb(146, 131, 116),
@@ -104,7 +111,6 @@ pub fn builtin(name: &str) -> Option<&'static Palette> {
 pub fn names() -> Vec<(&'static str, &'static str)> {
     vec![
         ("system", "System"),
-        ("dark", "Dark"),
         ("catppuccin", "Catppuccin"),
         ("rose-pine", "Rosé Pine"),
         ("tokyonight", "TokyoNight"),
@@ -139,6 +145,7 @@ pub fn custom(name: &str) -> Option<Palette> {
     };
     Some(Palette {
         bg: pick("bg", base.bg),
+        raised: pick("raised", base.raised),
         fg: pick("fg", base.fg),
         accent: pick("accent", base.accent),
         dim: pick("dim", base.dim),
@@ -166,7 +173,7 @@ mod tests {
 
     #[test]
     fn known_themes() {
-        for name in ["dark", "catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
+        for name in ["catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
             assert!(builtin(name).is_some(), "{name}");
         }
         assert!(builtin("light").is_none(), "no light themes");

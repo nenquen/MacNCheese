@@ -22,7 +22,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Padding, Paragraph, Tabs},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Tabs},
 };
 use serde_json::{Map, Value};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -563,14 +563,14 @@ fn title_block(pal: &crate::theme::Palette, title: &str) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
         .border_style(ratatui::style::Style::default().fg(pal.border))
-        .padding(Padding::horizontal(1))
-        .title(format!(" {title} "))
+        .style(ratatui::style::Style::default().bg(pal.raised))
+        .title(title.to_string())
 }
 
 pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)])
+        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(2)])
         .split(f.area());
 
     let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
@@ -660,9 +660,7 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
     );
     let btn = chunks[1];
     let label = if running { "Stop" } else { "Play Roblox" };
-    // Reserve the button row, then draw centered inside it.
-    f.render_widget(Paragraph::new("").block(title_block(pal, "")), btn);
-    clickable_button(f, app, pal, Rect::new(btn.x + 1, btn.y + 1, btn.width.saturating_sub(2), 1), label, Action::PlayToggle);
+    clickable_button(f, app, pal, Rect::new(btn.x, btn.y + 1, btn.width, 1), label, Action::PlayToggle);
 }
 
 fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
