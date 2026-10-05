@@ -18,3 +18,4 @@ libc = "0.2"
 ureq = { version = "3", features = ["json"] }
 zip = "2"
 sha2 = "0.10"
+png = "0.17"

@@ -279,6 +279,9 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Vec<
     if let Some(vram) = host_vram_bytes() {
         vars.push(format!("MACNCHEESE_VRAM_BYTES={vram}"));
     }
+    if let Some(icon) = crate::icon::icon_argb_file() {
+        vars.push(format!("MACNCHEESE_ICON_ARGB={}", icon.display()));
+    }
     if bool_of("hide_menu_bar", true) {
         vars.push("MACNCHEESE_HIDE_MENU_BAR=1".into());
     }

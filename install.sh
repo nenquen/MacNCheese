@@ -531,6 +531,8 @@ do_install() {
     install -Dm644 "$DIR/branding/icons/macncheese-$size.png" \
       "$DATA_HOME/icons/hicolor/${size}x${size}/apps/macncheese.png"
   done
+  install -Dm644 "$DIR/packaging/macncheese-roblox-window.desktop" \
+    "$DATA_HOME/applications/macncheese-roblox-window.desktop"
   # Leftover Python launcher entries.
   rm -f -- "$DATA_HOME/applications/org.macncheese.MacNCheese.Studio.desktop"
   local old_link=$HOME/.local/bin/macncheese

@@ -6,6 +6,7 @@
 mod audio;
 mod display;
 mod flags;
+mod icon;
 mod mods;
 mod patches;
 mod paths;
