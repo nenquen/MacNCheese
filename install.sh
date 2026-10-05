@@ -125,7 +125,7 @@ setup_plan() {
   printf '  Destination %s\n' "${DIR/#$HOME/\~}"
   printf '  %sSystem packages may ask for your sudo password.%s\n' "$DIM" "$RESET"
   if is_installed; then
-    printf '  %sUpdates keep settings, Roblox, Studio and existing backups.%s\n' "$DIM" "$RESET"
+    printf '  %sUpdates keep settings, Roblox and existing backups.%s\n' "$DIM" "$RESET"
     printf '  %sLocal source changes are backed up before replacement.%s\n' "$DIM" "$RESET"
   else
     printf '  %sFirst launch guides Roblox installation and sign-in.%s\n' "$DIM" "$RESET"
@@ -534,18 +534,14 @@ do_uninstall() {
     say "Stopping Roblox and Darling"
     darling shutdown >/dev/null 2>&1 || true
   fi
-  if [[ -x $DIR/studio/wine/bin/wineserver ]]; then
-    WINEPREFIX=$DIR/studio/prefix "$DIR/studio/wine/bin/wineserver" -k >/dev/null 2>&1 || true
-  fi
   if [[ -e $DIR ]]; then
-    say "Removing the launcher, Roblox and Studio (${DIR/#$HOME/\~})"
+    say "Removing the launcher and Roblox (${DIR/#$HOME/\~})"
     rm -rf -- "$DIR"
   fi
   say "Removing the app menu entries, icons and the macncheese command"
   local apps=$DATA_HOME/applications
   # The xyz.narez.* names are the app ID before 0.15, wtf.aubree.* before the MacNCheese rebrand.
   rm -f -- "$apps/org.macncheese.MacNCheese.desktop" "$apps/org.macncheese.MacNCheese.URI.desktop" \
-    "$apps/org.macncheese.MacNCheese.Studio.desktop" \
     "$apps/wtf.aubree.MacOBlox.desktop" "$apps/wtf.aubree.MacOBlox.URI.desktop" \
     "$apps/wtf.aubree.MacOBlox.Studio.desktop" \
     "$apps/xyz.narez.MacOBlox.desktop" "$apps/xyz.narez.MacOBlox.Studio.desktop" \
@@ -564,10 +560,8 @@ do_uninstall() {
   if [[ -L $old_link && $(readlink "$old_link") == */macoblox-launcher ]]; then
     rm -f -- "$old_link"
   fi
-  # Studio as the handler of roblox-studio: links and place files.
   if [[ -f $CONFIG_HOME/mimeapps.list ]]; then
-    sed -i -e 's/org\.macncheese\.MacNCheese\.Studio\.desktop;\{0,1\}//g' \
-      -e 's/org\.macncheese\.MacNCheese\.URI\.desktop;\{0,1\}//g' \
+    sed -i       -e 's/org\.macncheese\.MacNCheese\.URI\.desktop;\{0,1\}//g' \
       -e 's/wtf\.aubree\.MacOBlox\.Studio\.desktop;\{0,1\}//g' \
       -e 's/wtf\.aubree\.MacOBlox\.URI\.desktop;\{0,1\}//g' \
       -e 's/xyz\.narez\.MacOBlox\.Studio\.desktop;\{0,1\}//g' -e '/^[^=[]*=$/d' "$CONFIG_HOME/mimeapps.list"
@@ -738,7 +732,7 @@ PURGE=''
 menu_uninstall() {
   local where=${DIR/#$HOME/\~} prefix=${PREFIX/#$HOME/\~}
   choose "  ${BOLD}Uninstall removes${RESET}
-    ${BULLET} $where (the launcher, Roblox, Studio)
+    ${BULLET} $where (the launcher and Roblox)
     ${BULLET} the app menu entries, icons and the macncheese command
     ${BULLET} settings and cache
 

@@ -13,7 +13,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-from . import __version__, author, core, discord, dns, i18n, mods, studio, uri as uri_handoff  # noqa: E402
+from . import __version__, author, core, discord, dns, i18n, mods, uri as uri_handoff  # noqa: E402
 from .i18n import _  # noqa: E402
 from .setup import SetupWizard  # noqa: E402
 
@@ -440,7 +440,6 @@ class PlayPage(Adw.Bin):
 
         status = Adw.StatusPage()
         status.set_icon_name("macncheese")
-        status.set_title("Mac'n Cheese")
         self.status = status
 
         center_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
@@ -451,15 +450,6 @@ class PlayPage(Adw.Bin):
         self.log_button.set_visible(False)
         self.log_button.connect("clicked", lambda *_args: window.open_last_log())
         center_box.append(self.log_button)
-
-        links = Gtk.Box(spacing=6, halign=Gtk.Align.CENTER, margin_top=14)
-        for title, icon, uri in _links():
-            button = Gtk.Button(icon_name=icon, tooltip_text=title)
-            button.add_css_class("flat")
-            button.add_css_class("circular")
-            button.connect("clicked", lambda *_args, u=uri: _open_uri(window, u))
-            links.append(button)
-        center_box.append(links)
 
         status.set_child(center_box)
         self.stack.add_titled_with_icon(status, "play", _("Play"), "media-playback-start-symbolic")
@@ -491,24 +481,12 @@ class PlayPage(Adw.Bin):
         self.playtime_box.set_tooltip_text(_("Total playtime"))
         action_bar.pack_start(self.playtime_box)
 
-        self.studio_progress = Gtk.ProgressBar(show_text=True, visible=False)
-        self.studio_progress.set_size_request(160, -1)
-        action_bar.pack_start(self.studio_progress)
-
         self.play = Gtk.Button(label=_("Play"))
         self.play.add_css_class("suggested-action")
         self.play.add_css_class("pill")
         self.play.set_size_request(140, -1)
         self.play.connect("clicked", lambda *_args: self._on_play_clicked())
         action_bar.pack_end(self.play)
-
-        self.studio = Gtk.Button(label=_("Roblox Studio"))
-        self.studio.add_css_class("pill")
-        self.studio.set_size_request(130, -1)
-        self.studio.connect("clicked", lambda *_args: window.studio_clicked())
-        # Studio needs Wine, which the Flatpak does not have yet.
-        self.studio.set_visible(not os.path.exists("/.flatpak-info"))
-        action_bar.pack_end(self.studio)
 
         toolbar_view.add_bottom_bar(action_bar)
         self.set_child(toolbar_view)
@@ -1652,51 +1630,6 @@ ABOUT = ("Mac'n Cheese runs the real Roblox client for macOS on Linux through Da
          "It is not made by Roblox and is not affiliated with it.")
 
 
-def _links():
-    """(title, icon, uri) of the project's community pages."""
-    links = [("Discord", "macncheese-discord-symbolic", author.DISCORD_URL)]
-    if author.GITHUB_URL:
-        links.append(("GitHub", "macncheese-github-symbolic", author.GITHUB_URL))
-    return links
-
-
-def _page_sidebar(stack):
-    """The sidebar's page list. Adw.ViewSwitcherSidebar needs libadwaita 1.9;
-    older ones (Ubuntu 24.04 has 1.5, Debian 13 1.7) get a plain list of the
-    same pages."""
-    if hasattr(Adw, "ViewSwitcherSidebar"):
-        sidebar = Adw.ViewSwitcherSidebar()
-        sidebar.set_stack(stack)
-        return sidebar
-    names = []
-    rows = Gtk.ListBox(selection_mode=Gtk.SelectionMode.BROWSE)
-    rows.add_css_class("navigation-sidebar")
-    pages = stack.get_pages()
-    for index in range(pages.get_n_items()):
-        page = pages.get_item(index)
-        line = Gtk.Box(spacing=12)
-        line.append(Gtk.Image(icon_name=page.get_icon_name()))
-        line.append(Gtk.Label(label=page.get_title(), xalign=0))
-        rows.append(line)
-        names.append(page.get_name())
-
-    def selected(_rows, row):
-        if row is not None and stack.get_visible_child_name() != names[row.get_index()]:
-            stack.set_visible_child_name(names[row.get_index()])
-
-    def follow(*_args):
-        name = stack.get_visible_child_name()
-        if name in names:
-            row = rows.get_row_at_index(names.index(name))
-            if rows.get_selected_row() is not row:
-                rows.select_row(row)
-
-    rows.connect("row-selected", selected)
-    stack.connect("notify::visible-child-name", follow)
-    follow()
-    return rows
-
-
 def _open_uri(window, uri):
     Gtk.UriLauncher.new(uri).launch(window, None, None, None)
 
@@ -1708,15 +1641,6 @@ class InfoPage(Adw.PreferencesPage):
 
         about = Adw.PreferencesGroup(title="Mac'n Cheese", description=_(ABOUT))
         self.add(about)
-
-        community = Adw.PreferencesGroup(title=_("Community"))
-        for title, icon, uri in _links():
-            row = Adw.ActionRow(title=title, activatable=True)
-            row.add_prefix(Gtk.Image(icon_name=icon))
-            row.add_suffix(Gtk.Image(icon_name="adw-external-link-symbolic"))
-            row.connect("activated", lambda *_args, u=uri: _open_uri(window, u))
-            community.add(row)
-        self.add(community)
 
         made_by = Adw.PreferencesGroup(title=_("Authors"))
         self.avatar = Adw.Avatar(size=48, text=author.NAME, show_initials=True)
@@ -2293,62 +2217,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         # Keep the file until RobloxSession has started successfully.  If
         # Darling or the shim fails, the browser handoff can still be retried.
         self.launch(browser_uri)
-
-    def studio_clicked(self):
-        if studio.running():
-            _toast(self.toasts, _("Roblox Studio is already running"))
-            return
-        if not studio.needs_install():
-            self._update_and_start_studio()
-            return
-        dialog = Adw.AlertDialog(
-            heading=_("Install Roblox Studio?"),
-            body=_("Studio runs in its Windows version through Wine. Mac'n Cheese downloads Wine, "
-                   "DXVK and Studio, about 800 MB."))
-        dialog.add_response("cancel", _("Cancel"))
-        dialog.add_response("install", _("Install"))
-        dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
-        dialog.connect("response", lambda _d, result: result == "install" and self._update_and_start_studio())
-        dialog.present(self)
-
-    def _update_and_start_studio(self):
-        """Installs or updates Studio when needed, then starts it."""
-        page = self.play_page
-        page.studio.set_sensitive(False)
-        page.studio.set_label(_("Checking…"))
-
-        def progress(fraction, text):
-            GLib.idle_add(page.studio_progress.set_visible, True)
-            GLib.idle_add(page.studio_progress.set_fraction, fraction)
-            GLib.idle_add(page.studio_progress.set_text, text)
-
-        def work():
-            try:
-                studio.install(progress)
-            except Exception as error:
-                if studio.needs_install():
-                    raise
-                # Offline or Roblox unreachable: start the installed version.
-                print("Studio update skipped:", error)
-            studio.launch()
-
-        def done(_result, error):
-            page.studio.set_sensitive(True)
-            page.studio.set_label(_("Roblox Studio"))
-            page.studio_progress.set_visible(False)
-            if error:
-                _error_dialog(self, _("Could not start Roblox Studio"), str(error) or repr(error))
-            else:
-                _toast(self.toasts, _("Starting Roblox Studio…"))
-
-        def run():
-            try:
-                work()
-                GLib.idle_add(done, None, None)
-            except Exception as error:
-                GLib.idle_add(done, None, error)
-
-        threading.Thread(target=run, daemon=True).start()
 
     def launch(self, launch_uri=None):
         if not self.begin("starting"):

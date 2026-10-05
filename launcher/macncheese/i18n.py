@@ -112,21 +112,8 @@ RU = {
     "Back to Roblox": "Вернуться в Roblox",
     "Close": "Закрыть",
     "OK": "Понятно",
-    "Roblox Studio": "Roblox Studio",
-    "Roblox Studio is already running": "Roblox Studio уже запущен",
-    "Install Roblox Studio?": "Установить Roblox Studio?",
-    "Studio runs in its Windows version through Wine. Mac'n Cheese downloads Wine, "
-    "DXVK and Studio, about 800 MB.":
-        "Studio запускается в Windows-версии через Wine. Mac'n Cheese скачает Wine, "
-        "DXVK и Studio, это около 800 МБ.",
     "Install": "Установить",
-    "Could not start Roblox Studio": "Не удалось запустить Roblox Studio",
-    "Starting Roblox Studio…": "Запускаю Roblox Studio…",
     "{label}: {done} of {total} MB": "{label}: {done} из {total} МБ",
-    "Unpacking Wine": "Распаковываю Wine",
-    "Preparing Wine": "Готовлю Wine",
-    "Roblox Studio: {done} of {total} MB": "Roblox Studio: {done} из {total} МБ",
-    "Unknown Studio package manifest format": "Неизвестный формат манифеста пакетов Studio",
     "{name} failed its checksum": "{name} не прошёл проверку контрольной суммы",
     "Open last log": "Открыть последний лог",
     "Roblox exited with code {status}": "Roblox завершился с кодом {status}",
@@ -235,7 +222,6 @@ RU = {
     "Installed version": "Установленная версия",
     "not found": "не найдена",
     "Check for updates": "Проверить обновления",
-    "Checking…": "Проверяю…",
     "Updating…": "Обновляю…",
     "Could not check: {error}": "Не удалось проверить: {error}",
     "The latest version is installed": "Установлена последняя версия",
@@ -358,7 +344,6 @@ RU = {
     "Patch the client on every launch and after Roblox updates":
         "Патчить клиента при каждом запуске и после обновлений Roblox",
     "Throttle patch": "Патч троттлинга",
-    "Checking…": "Проверяю…",
     "Throttle patch failed": "Не удалось применить патч троттлинга",
     # Live logs view
     "Logs": "Логи",

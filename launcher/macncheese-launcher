@@ -5,14 +5,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# `macncheese --studio [link or file]` opens Roblox Studio directly; the system
-# calls it for roblox-studio: and roblox-studio-auth: links (sign in).
-if sys.argv[1:2] == ["--studio"]:
-    from macncheese import studio  # noqa: E402
-    if not studio.needs_install():
-        studio.launch(sys.argv[2:])
-        sys.exit(0)
-
 # Linux has no LaunchServices. Keep the browser's Roblox argument opaque and
 # let the normal launcher process consume it once Darling is ready. Writing it
 # before starting GTK also covers a second protocol click while the first

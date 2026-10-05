@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.21 — 2026-10-05
+
+### Focus: macOS client only
+
+- Removed Roblox Studio support entirely (Wine, downloads, menu entries,
+  protocol handlers): Mac'n Cheese runs the macOS game client, nothing else.
+- Play page decluttered: single brand title, Discord/GitHub buttons gone.
+- App icons install to the user theme on first run (AppImage fix).
+- Menu bar hidden by default on fresh installs.
+
 ## 0.20 — 2026-10-05
 
 ### Mac'n Cheese rebrand

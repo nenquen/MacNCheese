@@ -67,7 +67,11 @@
     <control>keyboard</control>
   </supports>
   <releases>
-    <release version="0.20" date="2026-10-05">
+    <release version="0.21" date="2026-10-05">
+      <description>
+        <p>Focus on the macOS game client: Studio support removed, decluttered Play page, first-run app icons, hidden menu bar by default.</p>
+      </description>
+    </release>    <release version="0.20" date="2026-10-05">
       <description>
         <p>Mac'n Cheese rebrand: independent codebase with renamed identifiers, paths and app ID, MacOBlox leftover cleanup, and updated AUR/Flatpak packaging.</p>
       </description>

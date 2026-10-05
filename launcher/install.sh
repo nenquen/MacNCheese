@@ -55,29 +55,7 @@ NoDisplay=true
 MimeType=x-scheme-handler/roblox;x-scheme-handler/roblox-player;
 DESKTOP
 
-# Roblox Studio (Windows version through Wine), also the handler of the
-# roblox-studio: links and of roblox-studio-auth: that signs Studio in.
-cat > "$data_home/applications/org.macncheese.MacNCheese.Studio.desktop" <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=Roblox Studio (Mac'n Cheese)
-Comment=Roblox Studio through Wine
-Comment[ru]=Roblox Studio через Wine
-Exec=$exec_path --studio %u
-Icon=macncheese
-Terminal=false
-Categories=Development;
-MimeType=x-scheme-handler/roblox-studio;x-scheme-handler/roblox-studio-auth;application/x-roblox-place;
-StartupWMClass=robloxstudiobeta.exe
-DESKTOP
-# Place files (.rbxl, .rbxlx) as their own type, so file managers open them
-# with Studio: no MIME database defines one.
-install -Dm644 "$project_dir/packaging/org.macncheese.MacNCheese.xml" "$data_home/mime/packages/org.macncheese.MacNCheese.xml"
-update-mime-database "$data_home/mime" 2>/dev/null || true
 if command -v xdg-mime >/dev/null; then
-  for type in x-scheme-handler/roblox-studio x-scheme-handler/roblox-studio-auth application/x-roblox-place; do
-    xdg-mime default org.macncheese.MacNCheese.Studio.desktop "$type"
-  done
   for type in x-scheme-handler/roblox x-scheme-handler/roblox-player; do
     xdg-mime default org.macncheese.MacNCheese.URI.desktop "$type"
   done

@@ -77,7 +77,6 @@ modules:
           - downloads
           - logs
           - work
-          - studio
           - ffmpeg6
           - ffmpeg_compat
           - frameworks_backup
