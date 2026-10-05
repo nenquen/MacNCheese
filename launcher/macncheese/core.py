@@ -85,6 +85,8 @@ DEFAULT_SETTINGS = {
     "auto_patch_throttle": True,
     "raw_mouse": True,
     "display_backend": "x11",
+    "follow_system_theme": True,
+    "use_system_font": True,
     "dpi_scale": 1.0,
     "dpi_scale_auto": True,
     "hide_menu_bar": True,

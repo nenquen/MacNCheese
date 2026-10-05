@@ -1075,6 +1075,22 @@ class SettingsPage(Adw.Bin):
         ui_scale.connect("notify::value", _ui_scale_changed)
         game.add(ui_scale)
 
+        follow_theme = Adw.SwitchRow(
+            title=_("Follow system light/dark mode"),
+            subtitle=_("KDE and GNOME switches apply live. Turn off to keep Adwaita default."),
+            active=settings.get("follow_system_theme", True))
+        follow_theme.connect("notify::active", lambda row, _pspec: window.set_setting(
+            "follow_system_theme", row.get_active()))
+        game.add(follow_theme)
+
+        system_font = Adw.SwitchRow(
+            title=_("Use system interface font"),
+            subtitle=_("Noto Sans on KDE instead of Cantarell. Applies on next launch."),
+            active=settings.get("use_system_font", True))
+        system_font.connect("notify::active", lambda row, _pspec: window.set_setting(
+            "use_system_font", row.get_active()))
+        game.add(system_font)
+
         mangohud = Adw.SwitchRow(
             title=_("MangoHud overlay"),
             subtitle=_("Show FPS, frametimes and CPU/GPU usage. Requires MangoHud; applies on next launch."),
@@ -2619,6 +2635,7 @@ class LauncherApp(Adw.Application):
             Gtk.Window.set_default_icon_name("macncheese")
             Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(
                 str(core.PROJECT / "launcher" / "icons"))
+            self._apply_desktop_integration()
             self.window = LauncherWindow(self)
             # Keep running while the window is hidden during a game.
             self.hold()
@@ -2630,6 +2647,35 @@ class LauncherApp(Adw.Application):
             GLib.timeout_add(300, lambda: self.window.set_focus(None) and False)
         if pending:
             GLib.idle_add(self.window.handle_uri, pending)
+
+    def _apply_desktop_integration(self):
+        """Ghostty-grade manners: system color scheme (live) and font."""
+        from . import desktop
+        try:
+            settings = core.load_settings()
+        except Exception:
+            settings = {}
+        manager = Adw.StyleManager.get_default()
+        if settings.get("follow_system_theme", True):
+            scheme = desktop.system_color_scheme()
+            manager.set_color_scheme(
+                Adw.ColorScheme.FORCE_DARK if scheme == "dark"
+                else Adw.ColorScheme.FORCE_LIGHT if scheme == "light"
+                else Adw.ColorScheme.DEFAULT)
+            desktop.watch_color_scheme(
+                lambda s: manager.set_color_scheme(
+                    Adw.ColorScheme.FORCE_DARK if s == "dark"
+                    else Adw.ColorScheme.FORCE_LIGHT if s == "light"
+                    else Adw.ColorScheme.DEFAULT)
+                if settings.get("follow_system_theme", True) else None)
+        if settings.get("use_system_font", True):
+            detected = desktop.system_font()
+            if detected:
+                provider = Gtk.CssProvider()
+                provider.load_from_string(desktop.font_css(*detected))
+                Gtk.StyleContext.add_provider_for_display(
+                    Gdk.Display.get_default(), provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def _close(self, window):
         window.settings_page.flush()

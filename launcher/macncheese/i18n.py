@@ -405,6 +405,10 @@ RU = {
         "Поддерживает эту версию: стабильность и скорость",
     "Made with Claude Opus 5.5": "Сделано с Claude Opus 5.5",
     "Anthropic's AI wrote the code together with the authors": "ИИ от Anthropic писал код вместе с авторами",
+    "Follow system light/dark mode": "Следовать системной теме",
+    "KDE and GNOME switches apply live. Turn off to keep Adwaita default.": "Переключения KDE и GNOME применяются сразу. Отключите, чтобы оставить Adwaita.",
+    "Use system interface font": "Использовать системный шрифт",
+    "Noto Sans on KDE instead of Cantarell. Applies on next launch.": "Noto Sans в KDE вместо Cantarell. Применяется при следующем запуске.",
 }
 
 
