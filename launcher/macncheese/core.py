@@ -315,6 +315,10 @@ def update_launcher(progress=None):
     if install_script.exists():
         subprocess.run([str(install_script)], cwd=str(PROJECT), check=True,
                        capture_output=True)
+    # Studio support is gone as of 0.21: remove its Wine/prefix/downloads.
+    studio_dir = DATA_DIR / "studio"
+    if studio_dir.is_dir():
+        shutil.rmtree(studio_dir, ignore_errors=True)
 
     if progress:
         progress(1.0, _("Mac'n Cheese updated successfully"))
