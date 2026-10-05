@@ -453,10 +453,10 @@ class PlayPage(Adw.Bin):
         center_box.append(self.log_button)
 
         status.set_child(center_box)
-        self.stack.add_titled_with_icon(status, "play", _("Play"), "media-playback-start-symbolic")
+        self.stack.add_titled_with_icon(status, "play", _("Play"), "macncheese-nav-play")
 
         self.logs_view = GameLogsView(window)
-        self.stack.add_titled_with_icon(self.logs_view, "logs", _("Logs"), "utilities-terminal-symbolic")
+        self.stack.add_titled_with_icon(self.logs_view, "logs", _("Logs"), "macncheese-nav-logs")
 
         self.top_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.top_box.set_margin_top(10)
@@ -2031,13 +2031,13 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.toasts = Adw.ToastOverlay()
         self.stack = Adw.ViewStack()
         self.play_page = PlayPage(self)
-        self.stack.add_titled_with_icon(self.play_page, "play", _("Play"), "applications-games-symbolic")
+        self.stack.add_titled_with_icon(self.play_page, "play", _("Play"), "macncheese-nav-play")
         self.settings_page = SettingsPage(self)
-        self.stack.add_titled_with_icon(self.settings_page, "settings", _("Settings"), "preferences-system-symbolic")
+        self.stack.add_titled_with_icon(self.settings_page, "settings", _("Settings"), "macncheese-nav-settings")
         self.mods_page = ModsPage(self)
-        self.stack.add_titled_with_icon(self.mods_page, "mods", _("Mods"), "application-x-addon-symbolic")
+        self.stack.add_titled_with_icon(self.mods_page, "mods", _("Mods"), "macncheese-nav-mods")
         self.info_page = InfoPage(self)
-        self.stack.add_titled_with_icon(self.info_page, "info", _("Info"), "help-about-symbolic")
+        self.stack.add_titled_with_icon(self.info_page, "info", _("Info"), "macncheese-nav-info")
         self.flags_page = self.settings_page.flags_page
 
         if page in ("flags", "env", "roblox"):
@@ -2051,11 +2051,17 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.split.set_min_sidebar_width(200)
         self.split.set_max_sidebar_width(260)
         self.split.set_sidebar_width_fraction(0.28)
-        self.split.set_show_sidebar(True)
+        self.split.set_show_sidebar(self.settings.get("show_sidebar", True))
 
         # Sidebar with the page list
         sidebar_toolbar = Adw.ToolbarView()
         sidebar_header = Adw.HeaderBar(show_end_title_buttons=False, show_start_title_buttons=False)
+        sidebar_header.set_title_widget(Gtk.Label(label=""))
+        sidebar_toggle = Gtk.Button(icon_name="sidebar-show-symbolic")
+        sidebar_toggle.add_css_class("flat")
+        sidebar_toggle.set_tooltip_text(_("Toggle sidebar"))
+        sidebar_toggle.connect("clicked", lambda *_args: self.toggle_sidebar())
+        sidebar_header.pack_start(sidebar_toggle)
         sidebar_toolbar.add_top_bar(sidebar_header)
 
         sidebar_toolbar.set_content(_page_sidebar(self.stack))
@@ -2116,6 +2122,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.play_page.refresh()
         if launch:
             self.play_clicked()
+
+    def toggle_sidebar(self):
+        show = not self.split.get_show_sidebar()
+        self.split.set_show_sidebar(show)
+        self.set_setting("show_sidebar", show)
 
     def _check_startup_update(self):
         try:
