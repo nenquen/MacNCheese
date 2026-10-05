@@ -6,22 +6,18 @@
 mod audio;
 mod display;
 mod flags;
+mod gui;
 mod icon;
 mod mods;
 mod patches;
 mod paths;
 mod session;
 mod settings;
+mod tui;
 mod update;
 
 use anyhow::Result;
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, MouseButton, MouseEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use ratatui::{
-    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -29,9 +25,7 @@ use ratatui::{
     Terminal,
 };
 use serde_json::{Map, Value};
-use std::io;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::Duration;
 
 // ---------------------------------------------------------------- state
 
@@ -88,13 +82,13 @@ enum SetupState {
     Failed(String),
 }
 
-struct App {
+pub struct App {
     tabs: Vec<Tab>,
     tab: usize,
     settings: Map<String, Value>,
-    session: Option<session::Session>,
+    pub(crate) session: Option<session::Session>,
     starting: bool,
-    status: String,
+    pub(crate) status: String,
     settings_cursor: usize,
     logs: Vec<std::path::PathBuf>,
     logs_state: ListState,
@@ -106,11 +100,11 @@ struct App {
     setup_rx: Receiver<SetupMsg>,
     update_tx: Sender<UpdateMsg>,
     update_rx: Receiver<UpdateMsg>,
-    clicks: Vec<(Rect, Action)>,
+    pub(crate) clicks: Vec<(Rect, Action)>,
 }
 
 impl App {
-    fn new() -> App {
+    pub fn new() -> App {
         let (start_tx, start_rx) = mpsc::channel();
         let (setup_tx, setup_rx) = mpsc::channel();
         let (update_tx, update_rx) = mpsc::channel();
@@ -155,7 +149,7 @@ impl App {
     }
 
     // -- play ------------------------------------------------------
-    fn play_toggle(&mut self) {
+    pub fn play_toggle(&mut self) {
         if self.session.is_some() {
             if let Some(mut s) = self.session.take() {
                 s.finish();
@@ -183,7 +177,7 @@ impl App {
     }
 
     // -- setup -----------------------------------------------------
-    fn run_setup(&mut self) {
+    pub fn run_setup(&mut self) {
         if matches!(self.setup, SetupState::Running(_)) {
             return;
         }
@@ -235,7 +229,7 @@ impl App {
         });
     }
 
-    fn finish_setup(&mut self, ok: bool) {
+    pub fn finish_setup(&mut self, ok: bool) {
         if ok {
             let mut settings = settings::load();
             settings.insert("setup_complete".into(), Value::Bool(true));
@@ -248,7 +242,7 @@ impl App {
     }
 
     // -- update check ----------------------------------------------
-    fn spawn_update_check(&mut self) {
+    pub fn spawn_update_check(&mut self) {
         let tx = self.update_tx.clone();
         std::thread::spawn(move || {
             let installed = update::installed_version();
@@ -265,7 +259,7 @@ impl App {
     }
 
     // -- per-tick ---------------------------------------------------
-    fn tick(&mut self) {
+    pub fn tick(&mut self) {
         while let Ok(msg) = self.start_rx.try_recv() {
             self.starting = false;
             match msg {
@@ -321,7 +315,7 @@ impl App {
         }
     }
 
-    fn refresh_logs(&mut self) {
+    pub fn refresh_logs(&mut self) {
         let mut files: Vec<_> = std::fs::read_dir(paths::logs_dir())
             .map(|rd| {
                 rd.flatten()
@@ -341,48 +335,54 @@ impl App {
     }
 
     // -- input ------------------------------------------------------
-    fn on_key(&mut self, code: crossterm::event::KeyCode) -> KeyAction {
-        use crossterm::event::KeyCode as K;
-        match code {
-            K::Char('q') | K::Esc => KeyAction::Quit,
-            K::Char('1') => self.goto(0),
-            K::Char('2') => self.goto(1),
-            K::Char('3') => self.goto(2),
-            K::Char('4') => self.goto(3),
-            K::Char('5') => self.goto(4),
-            K::Tab => {
+    pub fn on_input(&mut self, input: Input) -> KeyAction {
+        match input {
+            Input::Key(key) => self.on_key(key),
+            Input::Click(column, row) => self.on_click(column, row),
+        }
+    }
+
+    fn on_key(&mut self, key: Key) -> KeyAction {
+        match key {
+            Key::Char('q') | Key::Esc => KeyAction::Quit,
+            Key::Char('1') => self.goto(0),
+            Key::Char('2') => self.goto(1),
+            Key::Char('3') => self.goto(2),
+            Key::Char('4') => self.goto(3),
+            Key::Char('5') => self.goto(4),
+            Key::Tab => {
                 if !self.tabs.is_empty() {
                     self.tab = (self.tab + 1) % self.tabs.len();
                 }
                 KeyAction::None
             }
-            K::Enter => {
+            Key::Enter => {
                 self.activate();
                 KeyAction::None
             }
-            K::Up | K::Char('k') => {
+            Key::Up | Key::Char('k') => {
                 self.move_cursor(-1);
                 KeyAction::None
             }
-            K::Down | K::Char('j') => {
+            Key::Down | Key::Char('j') => {
                 self.move_cursor(1);
                 KeyAction::None
             }
-            K::Left | K::Char('h') => {
+            Key::Left | Key::Char('h') => {
                 self.nudge(false);
                 KeyAction::None
             }
-            K::Right | K::Char('l') => {
+            Key::Right | Key::Char('l') => {
                 self.nudge(true);
                 KeyAction::None
             }
-            K::Char('r') => {
+            Key::Char('r') => {
                 if self.current() == Tab::Logs {
                     self.refresh_logs();
                 }
                 KeyAction::None
             }
-            K::Char('e') => {
+            Key::Char('e') => {
                 if self.current() == Tab::Flags {
                     KeyAction::EditFlags
                 } else {
@@ -450,7 +450,7 @@ impl App {
         }
     }
 
-    fn on_click(&mut self, column: u16, row: u16) -> KeyAction {
+    pub fn on_click(&mut self, column: u16, row: u16) -> KeyAction {
         let hit = self
             .clicks
             .iter()
@@ -489,14 +489,48 @@ impl App {
     }
 }
 
-enum KeyAction {
+pub enum KeyAction {
     None,
     Quit,
     EditFlags,
 }
 
+/// Backend-agnostic input: crossterm and winit frontends both produce these.
+#[derive(Clone, Copy)]
+pub enum Key {
+    Up, Down, Left, Right, Enter, Esc, Tab,
+    Char(char),
+}
+
+#[derive(Clone, Copy)]
+pub enum Input {
+    Key(Key),
+    Click(u16, u16),
+}
+
 fn app_uri() -> Option<String> {
     std::env::args().skip(1).find(|a| !a.starts_with('-') && a.contains(':'))
+}
+
+fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("macncheese {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("Mac'n Cheese {} — Roblox on Linux through Darling", env!("CARGO_PKG_VERSION"));
+        println!("Usage: macncheese [--version|--help|--tui] [roblox-url]");
+        println!("Keys: 1-5 tabs · arrows/hjkl move · Enter activate · e edit flags · q quit.");
+        println!("Mouse: click tabs, buttons and rows.");
+        return Ok(());
+    }
+    let force_tui = args.iter().any(|a| a == "--tui");
+    let has_display = std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok();
+    if !force_tui && has_display {
+        return gui::run();
+    }
+    tui::run()
 }
 
 /// Apply the detected desktop scale once (mirrors dpi_scale_auto).
@@ -514,114 +548,13 @@ fn apply_detected_scale() {
     }
 }
 
-// ---------------------------------------------------------------- run
-
-fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--version" || a == "-V") {
-        println!("macncheese {}", env!("CARGO_PKG_VERSION"));
-        return Ok(());
-    }
-    if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("Mac'n Cheese {} — Roblox on Linux through Darling", env!("CARGO_PKG_VERSION"));
-        println!("Usage: macncheese [--version|--help] [roblox-url]");
-        println!("Keys: 1-5 tabs · arrows/hjkl move · Enter activate · e edit flags · q quit.");
-        println!("Mouse: click tabs, buttons and rows.");
-        return Ok(());
-    }
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    // Own window title instead of the shell's.
-    print!("\x1b]0;Mac'n Cheese\x07");
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let mut app = App::new();
-    let result = run(&mut terminal, &mut app);
-
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.show_cursor()?;
-    result
-}
-
-fn run(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    app: &mut App,
-) -> Result<()> {
-    app.refresh_logs();
-    loop {
-        app.tick();
-        app.clicks.clear();
-        terminal.draw(|f| ui(f, app))?;
-        if event::poll(Duration::from_millis(250))? {
-            match event::read()? {
-                Event::Key(key) => match app.on_key(key.code) {
-                    KeyAction::Quit => {
-                        if let Some(mut s) = app.session.take() {
-                            s.finish();
-                        }
-                        return Ok(());
-                    }
-                    KeyAction::EditFlags => return edit_flags(terminal, app).and(run(terminal, app)),
-                    KeyAction::None => {}
-                },
-                Event::Mouse(mouse)
-                    if mouse.kind == MouseEventKind::Down(MouseButton::Left) => {
-                        match app.on_click(mouse.column, mouse.row) {
-                            KeyAction::Quit => return Ok(()),
-                            KeyAction::EditFlags => return edit_flags(terminal, app).and(run(terminal, app)),
-                            KeyAction::None => {}
-                        }
-                    }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn edit_flags(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    app: &mut App,
-) -> Result<()> {
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.show_cursor()?;
-    let path = crate::flags::flags_file();
-    if !path.exists() {
-        let _ = crate::flags::save(&crate::flags::load());
-    }
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".into());
-    let ok = std::process::Command::new(&editor)
-        .arg(&path)
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if ok {
-        match std::fs::read_to_string(&path) {
-            Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
-                Ok(v) if v.is_object() => app.status = "Flags saved.".into(),
-                _ => app.status = "Invalid JSON: not an object.".into(),
-            },
-            Err(e) => app.status = format!("Could not read flags: {e}"),
-        }
-    } else {
-        app.status = format!("Editor exited: {editor}");
-    }
-    enable_raw_mode()?;
-    execute!(terminal.backend_mut(), EnterAlternateScreen, EnableMouseCapture)?;
-    terminal.clear()?;
-    Ok(())
-}
-
 // ---------------------------------------------------------------- ui
 
 fn title_block(title: &str) -> Block<'static> {
     Block::default().borders(Borders::ALL).title(title.to_string())
 }
 
-fn ui(f: &mut ratatui::Frame, app: &mut App) {
+pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)])
@@ -816,7 +749,7 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
 
 // ---------------------------------------------------------------- settings rows
 
-fn rows() -> Vec<Row> {
+pub(crate) fn rows() -> Vec<Row> {
     vec![
         Row::Cycle {
             key: "renderer",
@@ -831,7 +764,7 @@ fn rows() -> Vec<Row> {
     ]
 }
 
-enum Row {
+pub(crate) enum Row {
     Cycle { key: &'static str, title: &'static str, options: Vec<(&'static str, &'static str)> },
     Number { key: &'static str, title: &'static str, min: f64, max: f64, step: f64, pct: bool },
     Bool { key: &'static str, title: &'static str, default: bool },

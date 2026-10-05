@@ -56,30 +56,30 @@ if [ -z "${DARLING_SYSROOT:-}" ] && [ ! -d /usr/libexec/darling ] && [ ! -d /usr
   exit 1
 fi
 export MACNCHEESE_PROJECT="$HERE/usr/share/macncheese"
-# A TUI needs a terminal: double-clicked from a file manager there is none.
-# Non-interactive flags (--version/--help) run fine without one.
+if [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; then
+  # Graphical session: the GUI opens its own window, no terminal needed.
+  exec "$HERE/usr/bin/macncheese" "$@"
+fi
+# Headless: terminal UI needs a TTY (flags run fine without one).
 case " $* " in
-  *" --version "*|*" --help "*|*" -V "*|*" -h "*) ;;
-  *)
-    if [ ! -t 0 ] || [ ! -t 1 ]; then
-      for term in konsole gnome-terminal xfce4-terminal alacritty kitty foot xterm; do
-        if command -v "$term" >/dev/null 2>&1; then
-          case "$term" in
-            # Chromeless window: no tab bar, no menus — feels like its own app.
-            konsole) exec "$term" --hide-menubar --hide-tabbar --separate -e "$HERE/usr/bin/macncheese" "$@" ;;
-            gnome-terminal) exec "$term" --hide-menubar -- "$HERE/usr/bin/macncheese" "$@" ;;
-            xfce4-terminal) exec "$term" --hide-menubar --hide-toolbar -e "$HERE/usr/bin/macncheese" "$@" ;;
-            *) exec "$term" -e "$HERE/usr/bin/macncheese" "$@" ;;
-          esac
-        fi
-      done
-      echo "Mac'n Cheese needs a terminal. Run it from one:" >&2
-      echo "  $HERE/usr/bin/macncheese" >&2
-      exit 1
-    fi
-    ;;
+  *" --version "*|*" --help "*|*" -V "*|*" -h "*) exec "$HERE/usr/bin/macncheese" "$@" ;;
 esac
-exec "$HERE/usr/bin/macncheese" "$@"
+if [ ! -t 0 ] || [ ! -t 1 ]; then
+  for term in konsole gnome-terminal xfce4-terminal alacritty kitty foot xterm; do
+    if command -v "$term" >/dev/null 2>&1; then
+      case "$term" in
+        konsole) exec "$term" --hide-menubar --hide-tabbar --separate -e "$HERE/usr/bin/macncheese" --tui "$@" ;;
+        gnome-terminal) exec "$term" --hide-menubar -- "$HERE/usr/bin/macncheese" --tui "$@" ;;
+        xfce4-terminal) exec "$term" --hide-menubar --hide-toolbar -e "$HERE/usr/bin/macncheese" --tui "$@" ;;
+        *) exec "$term" -e "$HERE/usr/bin/macncheese" --tui "$@" ;;
+      esac
+    fi
+  done
+  echo "Mac'n Cheese needs a display or a terminal." >&2
+  exit 1
+fi
+exec "$HERE/usr/bin/macncheese" --tui "$@"
+
 APPRUN
 chmod +x -- "$APPDIR/AppRun"
 
