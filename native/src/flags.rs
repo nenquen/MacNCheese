@@ -143,3 +143,4 @@ mod tests {
         assert_eq!(parse_value("hello"), Value::from("hello"));
         assert_eq!(display_value(&Value::from("False")), "False");
     }
+}
