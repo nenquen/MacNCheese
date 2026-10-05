@@ -95,6 +95,7 @@ pub struct App {
     logs_state: ListState,
     log_tail: Vec<String>,
     flags_cursor: usize,
+    flags_state: ListState,
     flag_edit: Option<FlagEdit>,
     tail_scroll: u16,
     start_tx: Sender<StartMsg>,
@@ -191,6 +192,7 @@ impl App {
             logs_state: ListState::default(),
             log_tail: Vec::new(),
             flags_cursor: 0,
+            flags_state: ListState::default(),
             flag_edit: None,
             tail_scroll: 0,
             start_tx,
@@ -531,11 +533,38 @@ impl App {
         }
     }
 
+    /// Transport flags the app enforces itself; hidden from the list.
+    fn managed_keys() -> Vec<&'static str> {
+        vec![
+            "FFlagUseRbxTransportClient", "FFlagUseRbxTransportClient3",
+            "FFlagUseRbxTransportServer", "FFlagShareRbxTransport",
+            "FFlagRbxTransportRuntime", "DFFlagDebugDisableRbxTransportDummyClient",
+            "FFlagDebugDisableRbxTransportDummyClient",
+            "FStringRbxTransportDummyClientEnabledMinorVersions",
+            "FStringRbxTransportDummyClientEnabledMinorVersions_PlaceFilter",
+            "DFIntRbxTransportDummyClientConnectionTimeoutMs",
+            "DFIntRbxTransportQuicHandshakeTimeoutMs", "DFFlagEnablePopLatencyProbe3",
+            "DFFlagAttachPopUdpProbeToGameJoin2", "DFFlagRakNetFallbackToRbxTransportEvent",
+            "DFFlagRakNetFallbackToRbxTransportStatus", "DFFlagConnectDummyServiceClientEarly",
+            "DFIntRbxTransportClientConnectionWaitIntervalMs", "DFFlagHttpLocalThrottle",
+            "FFlagHttpLocalThrottle", "DFIntHttpMaxRetries", "DFIntHttpMaxRetryAfterSec",
+            "DFIntHttpRbxApiMaxThrottledQueueSize", "DFIntHttpRetryAndLocalThrottleJitterMaxPercent",
+            "DFFlagDebugSlimLoaderDisableHTTPRetry", "FFlagDebugSlimLoaderDisableHTTPRetry",
+            "DFIntBatchThumbnailMaxWaitMs", "DFIntBatchThumbnailMinWaitMs",
+            "DFIntBatchThumbnailExponentialInitialWaitMs", "DFIntBatchThumbnailMaxExponentialRetries",
+            "DFIntBatchThumbnailAllowedExternalTimedOutRetries",
+            "DFIntLuaAppThumbnailsApiRetryTimeMultiplier",
+        ]
+    }
+
     fn custom_flags(&self) -> Vec<(String, String)> {
         // No built-in presets: users research and add their own flags.
+        // Transport flags are enforced automatically and hidden here.
         let flags = crate::flags::load();
+        let managed = Self::managed_keys();
         let mut out: Vec<(String, String)> = flags
             .iter()
+            .filter(|(k, _)| !managed.contains(&k.as_str()))
             .map(|(k, v)| (k.clone(), crate::flags::display_value(v)))
             .collect();
         out.sort();
@@ -634,6 +663,7 @@ impl App {
                 let n = self.flag_rows().len() as i32;
                 if n > 0 {
                     self.flags_cursor = (self.flags_cursor as i32 + delta).clamp(0, n - 1) as usize;
+                    self.flags_state.select(Some(self.flags_cursor));
                 }
             }
             Tab::Logs => {
@@ -695,6 +725,7 @@ impl App {
             }
             Some(Action::FlagRow(i)) => {
                 self.flags_cursor = i;
+                self.flags_state.select(Some(i));
                 self.activate_flag();
                 KeyAction::None
             }
@@ -893,22 +924,26 @@ fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Pa
 
 fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let rows = app.flag_rows();
+    if app.flags_state.selected().is_none() && !rows.is_empty() {
+        app.flags_state.select(Some(app.flags_cursor.min(rows.len() - 1)));
+    }
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(3)])
         .split(area);
+    let managed = App::managed_keys().len();
     let items: Vec<ListItem> = rows
         .iter()
         .enumerate()
         .map(|(i, row)| {
-            let style = if Some(i) == (app.flag_edit.is_none().then_some(app.flags_cursor)) {
+            let style = if Some(i) == app.flags_state.selected() {
                 Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(pal.fg)
             };
             let text = match row {
                 FlagRow::Custom { key, value } => format!("{key} = {value}"),
-                FlagRow::Add => "[+] Add flag (a) · Enter edits · d deletes".to_string(),
+                FlagRow::Add => "[+] Add flag".to_string(),
             };
             app.clicks.push((
                 Rect::new(chunks[0].x + 1, chunks[0].y + 1 + i as u16, chunks[0].width.saturating_sub(2), 1),
@@ -917,7 +952,11 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
             ListItem::new(Line::from(Span::styled(text, style)))
         })
         .collect();
-    f.render_widget(List::new(items).block(title_block(pal, "Fast flags")), chunks[0]);
+    f.render_stateful_widget(
+        List::new(items).block(title_block(pal, &format!("Fast flags ({managed} transport flags auto-managed)"))),
+        chunks[0],
+        &mut app.flags_state,
+    );
     let editor = match &app.flag_edit {
         Some(ed) => {
             let prompt = match ed.stage {
@@ -926,7 +965,7 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
             };
             format!("{prompt}: {}▌", ed.buf)
         }
-        None => "a: add · Enter: toggle/edit · d: delete custom".to_string(),
+        None => "a: add · Enter: edit · d: delete".to_string(),
     };
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(editor, Style::default().fg(pal.dim)))).block(title_block(pal, "")),
@@ -968,10 +1007,16 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
         .map(|text| {
             let lines: Vec<&str> = text.lines().collect();
             let n = lines.len();
-            lines[n.saturating_sub(40)..].join("\n")
+            lines[n.saturating_sub(400)..].join("\n")
         })
         .unwrap_or_default();
-    f.render_widget(Paragraph::new(tail).block(title_block(pal, "Tail")), chunks[1]);
+    f.render_widget(
+        Paragraph::new(tail)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .scroll((app.tail_scroll, 0))
+            .block(title_block(pal, "Tail (PgUp/PgDn/wheel)")),
+        chunks[1],
+    );
 }
 
 fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
