@@ -38,10 +38,11 @@ fn with_app_id(attrs: WindowAttributes) -> WindowAttributes {
     attrs
 }
 
-fn find_mono_font() -> Option<Vec<u8>> {
+fn find_mono_font(preferred: &str) -> Option<Vec<u8>> {
     let mut candidates = vec![];
+    let pattern = if preferred.is_empty() { "monospace".into() } else { preferred.to_string() };
     if let Ok(out) = std::process::Command::new("fc-match")
-        .args(["monospace", "--format=%{file}"])
+        .args([&pattern, "--format=%{file}"])
         .output()
     {
         candidates.push(String::from_utf8_lossy(&out.stdout).trim().to_string());
@@ -165,7 +166,9 @@ impl ApplicationHandler for Gui {
             attrs = attrs.with_window_icon(Some(icon));
         }
         let window = Arc::new(el.create_window(attrs).unwrap());
-        let font_bytes = find_mono_font().unwrap_or_else(|| vec![]);
+        let stored = crate::settings::load();
+        let preferred = stored.get("tui_font").and_then(|v| v.as_str()).unwrap_or("");
+        let font_bytes = find_mono_font(preferred).unwrap_or_else(|| vec![]);
         let font = Font::new(if font_bytes.is_empty() {
             // Last resort: any bytes; backend falls back internally.
             Box::leak(vec![0u8; 4].into_boxed_slice())
@@ -177,15 +180,17 @@ impl ApplicationHandler for Gui {
             el.exit();
             return;
         };
-        let font_scale = crate::settings::load()
+        let font_scale = stored
             .get("tui_font_scale")
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0)
             .clamp(0.8, 2.0);
+        let mode = stored.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+        let pal = crate::theme::resolve(mode);
         let backend = futures_lite::future::block_on(
             Builder::from_font(font)
-                .with_bg_color(ratatui::style::Color::Black)
-                .with_fg_color(ratatui::style::Color::White)
+                .with_bg_color(pal.bg)
+                .with_fg_color(pal.fg)
                 .with_font_size_px((17.0 * font_scale) as u32)
                 .with_width_and_height(Dimensions { width: nz(WIN_W), height: nz(WIN_H) })
                 .build_with_target(window.clone()),

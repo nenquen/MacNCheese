@@ -8,6 +8,7 @@ mod display;
 mod flags;
 mod gui;
 mod icon;
+mod theme;
 mod mods;
 mod patches;
 mod paths;
@@ -19,7 +20,7 @@ mod update;
 use anyhow::Result;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Padding, Paragraph, Tabs},
 };
@@ -92,6 +93,7 @@ pub struct App {
     logs: Vec<std::path::PathBuf>,
     logs_state: ListState,
     log_tail: Vec<String>,
+    fonts: Vec<String>,
     start_tx: Sender<StartMsg>,
     start_rx: Receiver<StartMsg>,
     setup: SetupState,
@@ -125,6 +127,7 @@ impl App {
             logs: Vec::new(),
             logs_state: ListState::default(),
             log_tail: Vec::new(),
+            fonts: crate::theme::mono_fonts(),
             start_tx,
             start_rx,
             setup: SetupState::Idle,
@@ -407,7 +410,7 @@ impl App {
         match self.current() {
             Tab::Play => self.play_toggle(),
             Tab::Settings => {
-                if let Some(row) = rows().get(self.settings_cursor) {
+                if let Some(row) = setting_rows(self).get(self.settings_cursor) {
                     row.left(&mut self.settings);
                     self.save_settings();
                 }
@@ -420,7 +423,7 @@ impl App {
     fn move_cursor(&mut self, delta: i32) {
         match self.current() {
             Tab::Settings => {
-                let n = rows().len() as i32;
+                let n = setting_rows(self).len() as i32;
                 self.settings_cursor =
                     (self.settings_cursor as i32 + delta).clamp(0, n - 1) as usize;
             }
@@ -439,7 +442,7 @@ impl App {
         if self.current() != Tab::Settings {
             return;
         }
-        if let Some(row) = rows().get(self.settings_cursor) {
+        if let Some(row) = setting_rows(self).get(self.settings_cursor) {
             if right {
                 row.right(&mut self.settings);
             } else {
@@ -469,7 +472,7 @@ impl App {
             }
             Some(Action::SettingsRow(i)) => {
                 self.settings_cursor = i;
-                if let Some(r) = rows().get(i) {
+                if let Some(r) = setting_rows(self).get(i) {
                     r.left(&mut self.settings);
                     self.save_settings();
                 }
@@ -553,7 +556,7 @@ fn title_block(title: &str) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
         .padding(Padding::horizontal(1))
-        .title(title.to_string())
+        .title(format!(" {title} "))
 }
 
 pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
@@ -563,6 +566,8 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         .split(f.area());
 
     let titles: Vec<String> = app.tabs.iter().map(|t| t.title().to_string()).collect();
+    let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+    let pal = crate::theme::resolve(mode);
     let tabs = Tabs::new(titles)
         .divider(Span::raw(" | "))
         .block(
@@ -572,8 +577,8 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
                 .title(" Mac'n Cheese "),
         )
         .select(app.tab)
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .style(Style::default().fg(pal.fg))
+        .highlight_style(Style::default().fg(pal.accent).add_modifier(Modifier::BOLD));
     f.render_widget(tabs, chunks[0]);
     // Clickable tab segments follow the widget's own left-aligned layout:
     // titles joined by " | ", starting just inside the border.
@@ -590,11 +595,11 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
     }
 
     match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
-        Tab::Play => render_play(f, app, chunks[1]),
-        Tab::Settings => render_settings(f, app, chunks[1]),
-        Tab::Flags => render_flags(f, app, chunks[1]),
-        Tab::Logs => render_logs(f, app, chunks[1]),
-        Tab::Setup => render_setup(f, app, chunks[1]),
+        Tab::Play => render_play(f, app, pal, chunks[1]),
+        Tab::Settings => render_settings(f, app, pal, chunks[1]),
+        Tab::Flags => render_flags(f, app, pal, chunks[1]),
+        Tab::Logs => render_logs(f, app, pal, chunks[1]),
+        Tab::Setup => render_setup(f, app, pal, chunks[1]),
     }
 
     let hint = match app.tabs.get(app.tab).copied().unwrap_or(Tab::Play) {
@@ -605,23 +610,23 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
         Tab::Setup => "Enter: run setup · q quit",
     };
     let status = Paragraph::new(vec![
-        Line::from(Span::styled(app.status.clone(), Style::default().fg(Color::Cyan))),
-        Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray))),
+        Line::from(Span::styled(app.status.clone(), Style::default().fg(pal.accent))),
+        Line::from(Span::styled(hint, Style::default().fg(pal.dim))),
     ])
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(status, chunks[2]);
 }
 
-fn clickable_button(f: &mut ratatui::Frame, app: &mut App, area: Rect, label: &str, action: Action) {
+fn clickable_button(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect, label: &str, action: Action) {
     let text = format!("[ {label} ]");
     let x = area.x + area.width.saturating_sub(text.len() as u16 + 2) / 2;
     let y = area.y + area.height / 2;
     let rect = Rect::new(x, y, text.len() as u16 + 2, 1);
     app.clicks.push((rect, action));
-    f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::default().fg(Color::Yellow)))), rect);
+    f.render_widget(Paragraph::new(Line::from(Span::styled(text, Style::default().fg(pal.accent)))), rect);
 }
 
-fn render_play(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let running = app.session.is_some();
     let mut lines = vec![
         Line::from(Span::styled(
@@ -632,12 +637,12 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
             } else {
                 "○ Roblox stopped"
             },
-            Style::default().fg(if running { Color::Green } else { Color::White }),
+            Style::default().fg(if running { pal.ok } else { pal.fg }),
         )),
         Line::from(""),
     ];
     for line in app.log_tail.iter() {
-        lines.push(Line::from(Span::styled(line.clone(), Style::default().fg(Color::DarkGray))));
+        lines.push(Line::from(Span::styled(line.clone(), Style::default().fg(pal.dim))));
     }
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -651,17 +656,17 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
     let label = if running { "Stop" } else { "Play Roblox" };
     // Reserve the button row, then draw centered inside it.
     f.render_widget(Paragraph::new("").block(title_block("")), btn);
-    clickable_button(f, app, Rect::new(btn.x + 1, btn.y + 1, btn.width.saturating_sub(2), 1), label, Action::PlayToggle);
+    clickable_button(f, app, pal, Rect::new(btn.x + 1, btn.y + 1, btn.width.saturating_sub(2), 1), label, Action::PlayToggle);
 }
 
-fn render_settings(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let y0 = area.y + 1;
-    let items: Vec<ListItem> = rows()
+    let items: Vec<ListItem> = setting_rows(app)
         .iter()
         .enumerate()
         .map(|(i, row)| {
             let style = if i == app.settings_cursor {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
@@ -675,11 +680,11 @@ fn render_settings(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
     f.render_widget(List::new(items).block(title_block("Settings")), area);
 }
 
-fn render_flags(f: &mut ratatui::Frame, _app: &mut App, area: Rect) {
+fn render_flags(f: &mut ratatui::Frame, _app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let flags = crate::flags::load();
     let mut lines = vec![Line::from(Span::styled(
         format!("{} flags · press e to edit in $EDITOR (clicks work too)", flags.len()),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(pal.dim),
     ))];
     let mut keys: Vec<&String> = flags.keys().collect();
     keys.sort();
@@ -690,7 +695,7 @@ fn render_flags(f: &mut ratatui::Frame, _app: &mut App, area: Rect) {
     f.render_widget(Paragraph::new(lines).block(title_block("Fast flags")), area);
 }
 
-fn render_logs(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
@@ -712,7 +717,7 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(
         List::new(items)
             .block(title_block("Logs"))
-            .highlight_style(Style::default().fg(Color::Yellow)),
+            .highlight_style(Style::default().fg(pal.accent)),
         chunks[0],
         &mut app.logs_state,
     );
@@ -730,7 +735,7 @@ fn render_logs(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
     f.render_widget(Paragraph::new(tail).block(title_block("Tail")), chunks[1]);
 }
 
-fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
+fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
     let explainer = vec![
         Line::from("First run: Mac'n Cheese will:"),
         Line::from("  1. Download the Roblox client (~300 MB)"),
@@ -741,10 +746,10 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
         Line::from(""),
     ];
     let (state, color) = match &app.setup {
-        SetupState::Idle => (String::new(), Color::White),
-        SetupState::Running(step) => (format!("… {step}"), Color::Yellow),
-        SetupState::Done(msg) => (format!("✓ {msg}"), Color::Green),
-        SetupState::Failed(err) => (format!("✗ {err}"), Color::Red),
+        SetupState::Idle => (String::new(), pal.fg),
+        SetupState::Running(step) => (format!("… {step}"), pal.accent),
+        SetupState::Done(msg) => (format!("✓ {msg}"), pal.ok),
+        SetupState::Failed(err) => (format!("✗ {err}"), pal.err),
     };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -758,22 +763,22 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: Rect) {
         Paragraph::new(lines).block(title_block("Setup")),
         chunks[0],
     );
-    clickable_button(f, app, chunks[1], "Yes, run setup", Action::SetupRun);
+    clickable_button(f, app, pal, chunks[1], "Yes, run setup", Action::SetupRun);
 }
 
 // ---------------------------------------------------------------- settings rows
 
-pub(crate) fn rows() -> Vec<Row> {
-    vec![
+pub(crate) fn setting_rows(app: &App) -> Vec<Row> {
+    let mut out = vec![
         Row::Cycle {
             key: "renderer",
             title: "Renderer",
-            options: vec![("opengl", "OpenGL"), ("vulkan", "Vulkan (Zink, experimental)")],
+            options: vec![("opengl".into(), "OpenGL".into()), ("vulkan".into(), "Vulkan (Zink, experimental)".into())],
         },
         Row::Cycle {
             key: "display_backend",
             title: "Window backend",
-            options: vec![("x11", "X11 / Xwayland"), ("wayland", "Native Wayland (experimental)")],
+            options: vec![("x11".into(), "X11 / Xwayland".into()), ("wayland".into(), "Native Wayland (experimental)".into())],
         },
         Row::Number { key: "dpi_scale", title: "Roblox UI scale", min: 1.0, max: 4.0, step: 0.05, pct: true },
         Row::Number { key: "mouse_sensitivity", title: "Camera sensitivity", min: 0.1, max: 5.0, step: 0.05, pct: false },
@@ -781,11 +786,23 @@ pub(crate) fn rows() -> Vec<Row> {
         Row::Bool { key: "hide_menu_bar", title: "Hide the macOS menu bar", default: true },
         Row::Bool { key: "mangohud", title: "MangoHud overlay", default: false },
         Row::Number { key: "tui_font_scale", title: "TUI font scale", min: 0.8, max: 2.0, step: 0.1, pct: false },
-    ]
+        Row::Cycle {
+            key: "theme",
+            title: "Color theme",
+            options: [("system", "System"), ("dark", "Dark"), ("light", "Light")]
+                .into_iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect(),
+        },
+    ];
+    let mut fonts = vec![("".to_string(), "Auto (system monospace)".to_string())];
+    fonts.extend(app.fonts.iter().map(|f| (f.clone(), f.clone())));
+    out.push(Row::Cycle { key: "tui_font", title: "TUI font", options: fonts });
+    out
 }
 
 pub(crate) enum Row {
-    Cycle { key: &'static str, title: &'static str, options: Vec<(&'static str, &'static str)> },
+    Cycle { key: &'static str, title: &'static str, options: Vec<(String, String)> },
     Number { key: &'static str, title: &'static str, min: f64, max: f64, step: f64, pct: bool },
     Bool { key: &'static str, title: &'static str, default: bool },
 }
@@ -795,7 +812,11 @@ impl Row {
         match self {
             Row::Cycle { title, options, key } => {
                 let cur = settings.get(*key).and_then(|v| v.as_str()).unwrap_or("");
-                let label = options.iter().find(|(v, _)| *v == cur).map(|(_, l)| *l).unwrap_or(cur);
+                let label = options
+                    .iter()
+                    .find(|(v, _)| v.as_str() == cur)
+                    .map(|(_, l)| l.clone())
+                    .unwrap_or_else(|| cur.to_string());
                 format!("{title}: {label}")
             }
             Row::Number { title, key, pct, .. } => {
@@ -818,7 +839,7 @@ impl Row {
             Row::Cycle { key, options, .. } => {
                 let cur = settings.get(*key).and_then(|v| v.as_str()).unwrap_or("");
                 let i = options.iter().position(|(v, _)| *v == cur).unwrap_or(0);
-                let next = options[(i + 1) % options.len()].0;
+                let next = options[(i + 1) % options.len()].0.clone();
                 settings.insert(key.to_string(), Value::from(next));
             }
             Row::Number { key, min, step, .. } => {
@@ -882,9 +903,10 @@ mod tui_tests {
     #[test]
     fn settings_rows_mutate_in_range() {
         let mut settings = settings::load();
-        rows()[0].left(&mut settings);
+        let app = App::new();
+        setting_rows(&app)[0].left(&mut settings);
         assert!(["opengl", "vulkan"].contains(&settings["renderer"].as_str().unwrap()));
-        rows()[1].right(&mut settings);
+        setting_rows(&app)[1].right(&mut settings);
         let dpi = settings["dpi_scale"].as_f64().unwrap();
         assert!((1.0..=4.0).contains(&dpi), "dpi out of range: {dpi}");
     }
