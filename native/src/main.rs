@@ -55,6 +55,7 @@ enum Action {
     Tab(usize),
     PlayToggle,
     SettingsRow(usize),
+    FlagRow(usize),
     LogRow(usize),
     SetupRun,
 }
@@ -93,6 +94,9 @@ pub struct App {
     logs: Vec<std::path::PathBuf>,
     logs_state: ListState,
     log_tail: Vec<String>,
+    flags_cursor: usize,
+    flag_edit: Option<FlagEdit>,
+    tail_scroll: u16,
     start_tx: Sender<StartMsg>,
     start_rx: Receiver<StartMsg>,
     setup: SetupState,
@@ -101,6 +105,67 @@ pub struct App {
     update_tx: Sender<UpdateMsg>,
     update_rx: Receiver<UpdateMsg>,
     pub(crate) clicks: Vec<(Rect, Action)>,
+}
+
+#[derive(Clone)]
+enum FlagRow {
+    Preset { key: &'static str, title: &'static str, label: String },
+    Custom { key: String, value: String },
+    Add,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum EditStage {
+    Name,
+    Value,
+}
+
+struct FlagEdit {
+    stage: EditStage,
+    name: String,
+    buf: String,
+}
+
+impl FlagEdit {
+    fn name() -> FlagEdit {
+        FlagEdit { stage: EditStage::Name, name: String::new(), buf: String::new() }
+    }
+
+    fn value(name: String, current: String) -> FlagEdit {
+        FlagEdit { stage: EditStage::Value, name, buf: current }
+    }
+}
+
+enum EditDone {
+    Cancel,
+    Pending,
+    Name(String),
+    Save(String, String),
+}
+
+impl FlagEdit {
+    fn key(&mut self, key: Key) -> EditDone {
+        match key {
+            Key::Esc => EditDone::Cancel,
+            Key::Enter => match self.stage {
+                EditStage::Name => EditDone::Name(std::mem::take(&mut self.buf)),
+                EditStage::Value => {
+                    EditDone::Save(std::mem::take(&mut self.name), std::mem::take(&mut self.buf))
+                }
+            },
+            Key::Backspace => {
+                self.buf.pop();
+                EditDone::Pending
+            }
+            Key::Char(c) => {
+                if !c.is_control() {
+                    self.buf.push(c);
+                }
+                EditDone::Pending
+            }
+            _ => EditDone::Pending,
+        }
+    }
 }
 
 impl App {
@@ -126,6 +191,9 @@ impl App {
             logs: Vec::new(),
             logs_state: ListState::default(),
             log_tail: Vec::new(),
+            flags_cursor: 0,
+            flag_edit: None,
+            tail_scroll: 0,
             start_tx,
             start_rx,
             setup: SetupState::Idle,
@@ -343,6 +411,9 @@ impl App {
     }
 
     fn on_key(&mut self, key: Key) -> KeyAction {
+        if self.flag_edit.is_some() {
+            return self.edit_key(key);
+        }
         match key {
             Key::Char('q') | Key::Esc => KeyAction::Quit,
             Key::Char('1') => self.goto(0),
@@ -368,6 +439,18 @@ impl App {
                 self.move_cursor(1);
                 KeyAction::None
             }
+            Key::Char('a') => {
+                if self.current() == Tab::Flags {
+                    self.flag_edit = Some(FlagEdit::name());
+                }
+                KeyAction::None
+            }
+            Key::Char('d') => {
+                if self.current() == Tab::Flags {
+                    self.delete_flag();
+                }
+                KeyAction::None
+            }
             Key::Left | Key::Char('h') => {
                 self.nudge(false);
                 KeyAction::None
@@ -382,12 +465,23 @@ impl App {
                 }
                 KeyAction::None
             }
+            Key::PageUp => {
+                if self.current() == Tab::Logs {
+                    self.tail_scroll = self.tail_scroll.saturating_add(10);
+                }
+                KeyAction::None
+            }
+            Key::PageDown => {
+                if self.current() == Tab::Logs {
+                    self.tail_scroll = self.tail_scroll.saturating_sub(10);
+                }
+                KeyAction::None
+            }
             Key::Char('e') => {
                 if self.current() == Tab::Flags {
-                    KeyAction::EditFlags
-                } else {
-                    KeyAction::None
+                    self.begin_edit_value();
                 }
+                KeyAction::None
             }
             _ => KeyAction::None,
         }
@@ -414,18 +508,150 @@ impl App {
                 }
             }
             Tab::Setup => self.run_setup(),
+            Tab::Flags => self.activate_flag(),
             _ => {}
         }
     }
 
+    /// Fishstrap-style presets: FPS cap cycle + post-FX toggle.
+    fn preset_rows() -> Vec<(&'static str, &'static str, Vec<(String, String)>)> {
+        vec![
+            ("DFIntTaskSchedulerTargetFps", "FPS cap", vec![
+                ("60".into(), "60".into()), ("120".into(), "120".into()),
+                ("144".into(), "144".into()), ("240".into(), "240".into()),
+                ("0".into(), "Unlimited".into()),
+            ]),
+            ("FFlagDisablePostFx", "Disable post effects", vec![
+                ("True".into(), "on".into()), ("False".into(), "off".into()),
+            ]),
+        ]
+    }
+
+    fn known_keys() -> Vec<&'static str> {
+        Self::preset_rows().into_iter().map(|(k, _, _)| k).collect()
+    }
+
+    fn custom_flags(&self) -> Vec<(String, String)> {
+        let flags = crate::flags::load();
+        let known = Self::known_keys();
+        let mut out: Vec<(String, String)> = flags
+            .iter()
+            .filter(|(k, _)| !known.contains(&k.as_str()))
+            .map(|(k, v)| (k.clone(), crate::flags::display_value(v)))
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// Selectable rows: presets, customs, [+ Add].
+    fn flag_rows(&self) -> Vec<FlagRow> {
+        let flags = crate::flags::load();
+        let mut rows = vec![];
+        for (key, title, options) in Self::preset_rows() {
+            let cur = flags.get(key).and_then(|v| v.as_str()).unwrap_or("");
+            let label = options.iter().find(|(v, _)| *v == cur).map(|(_, l)| l.clone()).unwrap_or_else(|| cur.to_string());
+            rows.push(FlagRow::Preset { key, title, label });
+        }
+        for (key, value) in self.custom_flags() {
+            rows.push(FlagRow::Custom { key, value });
+        }
+        rows.push(FlagRow::Add);
+        rows
+    }
+
+    fn save_flag(&self, key: &str, raw: &str) {
+        let mut flags = crate::flags::load();
+        // Keep the file's existing convention (this client historically
+        // stores strings); new keys get typed values.
+        let value = match flags.get(key) {
+            Some(Value::String(_)) => Value::from(raw.trim()),
+            _ => crate::flags::parse_value(raw),
+        };
+        flags.insert(key.to_string(), value);
+        let _ = crate::flags::save(&flags);
+    }
+
+    fn activate_flag(&mut self) {
+        let rows = self.flag_rows();
+        match rows.get(self.flags_cursor) {
+            Some(FlagRow::Preset { key, .. }) => {
+                let flags = crate::flags::load();
+                let cur = flags.get(*key).and_then(|v| v.as_str()).unwrap_or("");
+                let opts = Self::preset_rows().into_iter().find(|(k, _, _)| *k == *key).map(|(_, _, o)| o).unwrap_or_default();
+                let i = opts.iter().position(|(v, _)| *v == cur).unwrap_or(0);
+                let next = opts[(i + 1) % opts.len()].0.clone();
+                self.save_flag(key, &next);
+            }
+            Some(FlagRow::Custom { key, value }) => {
+                self.flag_edit = Some(FlagEdit::value(key.clone(), value.clone()));
+            }
+            Some(FlagRow::Add) => self.flag_edit = Some(FlagEdit::name()),
+            None => {}
+        }
+    }
+
+    fn begin_edit_value(&mut self) {
+        match self.flag_rows().get(self.flags_cursor) {
+            Some(FlagRow::Custom { key, value }) => {
+                self.flag_edit = Some(FlagEdit::value(key.clone(), value.clone()));
+            }
+            Some(FlagRow::Add) => self.flag_edit = Some(FlagEdit::name()),
+            _ => self.activate_flag(),
+        }
+    }
+
+    fn delete_flag(&mut self) {
+        if let Some(FlagRow::Custom { key, .. }) = self.flag_rows().get(self.flags_cursor) {
+            let mut flags = crate::flags::load();
+            let key = key.clone();
+            flags.remove(&key);
+            let _ = crate::flags::save(&flags);
+            self.status = format!("Removed {key}.");
+        }
+    }
+
+    fn edit_key(&mut self, key: Key) -> KeyAction {
+        let done = match self.flag_edit.as_mut() {
+            Some(ed) => ed.key(key),
+            None => EditDone::Cancel,
+        };
+        match done {
+            EditDone::Cancel => self.flag_edit = None,
+            EditDone::Pending => {}
+            EditDone::Name(name) => {
+                if name.is_empty() {
+                    self.flag_edit = None;
+                } else {
+                    self.flag_edit = Some(FlagEdit::value(name, String::new()));
+                }
+            }
+            EditDone::Save(name, value) => {
+                self.flag_edit = None;
+                if !name.is_empty() {
+                    self.save_flag(&name, &value);
+                    self.status = format!("Saved {name}.");
+                }
+            }
+        }
+        KeyAction::None
+    }
+
     fn move_cursor(&mut self, delta: i32) {
+        self.tail_scroll = 0;
         match self.current() {
             Tab::Settings => {
                 let n = setting_rows().len() as i32;
                 self.settings_cursor =
                     (self.settings_cursor as i32 + delta).clamp(0, n - 1) as usize;
             }
+            Tab::Flags => {
+                let n = self.flag_rows().len() as i32;
+                if n > 0 {
+                    self.flags_cursor = (self.flags_cursor as i32 + delta).clamp(0, n - 1) as usize;
+                }
+            }
             Tab::Logs => {
+                self.tail_scroll = 0;
                 let i = self.logs_state.selected().unwrap_or(0) as i32 + delta;
                 let max = self.logs.len().saturating_sub(1) as i32;
                 if max >= 0 {
@@ -478,6 +704,12 @@ impl App {
             }
             Some(Action::LogRow(i)) => {
                 self.logs_state.select(Some(i));
+                self.tail_scroll = 0;
+                KeyAction::None
+            }
+            Some(Action::FlagRow(i)) => {
+                self.flags_cursor = i;
+                self.activate_flag();
                 KeyAction::None
             }
             Some(Action::SetupRun) => {
@@ -492,13 +724,12 @@ impl App {
 pub enum KeyAction {
     None,
     Quit,
-    EditFlags,
 }
 
 /// Backend-agnostic input: crossterm and winit frontends both produce these.
 #[derive(Clone, Copy)]
 pub enum Key {
-    Up, Down, Left, Right, Enter, Esc, Tab,
+    Up, Down, Left, Right, Enter, Esc, Tab, PageUp, PageDown, Backspace,
     Char(char),
 }
 
@@ -672,19 +903,48 @@ fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Pa
     f.render_widget(List::new(items).block(title_block(pal, "Settings")), area);
 }
 
-fn render_flags(f: &mut ratatui::Frame, _app: &mut App, pal: &crate::theme::Palette, area: Rect) {
-    let flags = crate::flags::load();
-    let mut lines = vec![Line::from(Span::styled(
-        format!("{} flags · press e to edit in $EDITOR (clicks work too)", flags.len()),
-        Style::default().fg(pal.dim),
-    ))];
-    let mut keys: Vec<&String> = flags.keys().collect();
-    keys.sort();
-    for key in keys.iter().take(60) {
-        let value = &flags[*key];
-        lines.push(Line::from(format!("{key} = {}", value.as_str().unwrap_or("?"))));
-    }
-    f.render_widget(Paragraph::new(lines).block(title_block(pal, "Fast flags")), area);
+fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
+    let rows = app.flag_rows();
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(3)])
+        .split(area);
+    let items: Vec<ListItem> = rows
+        .iter()
+        .enumerate()
+        .map(|(i, row)| {
+            let style = if Some(i) == (app.flag_edit.is_none().then_some(app.flags_cursor)) {
+                Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(pal.fg)
+            };
+            let text = match row {
+                FlagRow::Preset { title, label, .. } => format!("{title}: {label}"),
+                FlagRow::Custom { key, value } => format!("{key} = {value}"),
+                FlagRow::Add => "[+] Add flag (a) · Enter toggles · d deletes custom".to_string(),
+            };
+            app.clicks.push((
+                Rect::new(chunks[0].x + 1, chunks[0].y + 1 + i as u16, chunks[0].width.saturating_sub(2), 1),
+                Action::FlagRow(i),
+            ));
+            ListItem::new(Line::from(Span::styled(text, style)))
+        })
+        .collect();
+    f.render_widget(List::new(items).block(title_block(pal, "Fast flags")), chunks[0]);
+    let editor = match &app.flag_edit {
+        Some(ed) => {
+            let prompt = match ed.stage {
+                EditStage::Name => "Flag name".to_string(),
+                EditStage::Value => format!("Value for {}", ed.name),
+            };
+            format!("{prompt}: {}▌", ed.buf)
+        }
+        None => "a: add · Enter: toggle/edit · d: delete custom".to_string(),
+    };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(editor, Style::default().fg(pal.dim)))).block(title_block(pal, "")),
+        chunks[1],
+    );
 }
 
 fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {

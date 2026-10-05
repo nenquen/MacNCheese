@@ -85,6 +85,33 @@ pub fn ensure_raknet() -> bool {
     changed
 }
 
+/// Human-readable flag value for lists.
+pub fn display_value(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
+        _ => "?".into(),
+    }
+}
+
+/// Parse editor input: true/false, numbers, else string.
+pub fn parse_value(raw: &str) -> Value {
+    let s = raw.trim();
+    match s {
+        "true" | "True" => return Value::Bool(true),
+        "false" | "False" => return Value::Bool(false),
+        _ => {}
+    }
+    if let Ok(n) = s.parse::<i64>() {
+        return Value::from(n);
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        return Value::from(n);
+    }
+    Value::from(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,3 +135,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+    #[test]
+    fn value_parsing() {
+        use super::{display_value, parse_value};
+        assert_eq!(parse_value("True"), Value::Bool(true));
+        assert_eq!(parse_value(" 120 "), Value::from(120));
+        assert_eq!(parse_value("hello"), Value::from("hello"));
+        assert_eq!(display_value(&Value::from("False")), "False");
+    }

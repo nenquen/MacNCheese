@@ -81,6 +81,9 @@ fn to_key(event: &KeyEvent) -> Option<Key> {
         WKey::Named(NamedKey::Enter) => Some(Key::Enter),
         WKey::Named(NamedKey::Escape) => Some(Key::Esc),
         WKey::Named(NamedKey::Tab) => Some(Key::Tab),
+        WKey::Named(NamedKey::PageUp) => Some(Key::PageUp),
+        WKey::Named(NamedKey::PageDown) => Some(Key::PageDown),
+        WKey::Named(NamedKey::Backspace) => Some(Key::Backspace),
         WKey::Character(s) => s.chars().next().map(Key::Char),
         _ => None,
     }
@@ -141,12 +144,6 @@ impl Gui {
                     s.finish();
                 }
                 el.exit();
-            }
-            KeyAction::EditFlags => {
-                self.app.status = format!(
-                    "Edit {} in a text editor, then press r on Logs.",
-                    crate::flags::flags_file().display()
-                );
             }
             KeyAction::None => {}
         }

@@ -24,6 +24,9 @@ fn to_input(event: Event) -> Option<Input> {
                 K::Enter => Key::Enter,
                 K::Esc => Key::Esc,
                 K::Tab => Key::Tab,
+                K::Backspace => Key::Backspace,
+                K::PageUp => Key::PageUp,
+                K::PageDown => Key::PageDown,
                 K::Char(c) => Key::Char(c),
                 _ => return None,
             };
@@ -34,40 +37,6 @@ fn to_input(event: Event) -> Option<Input> {
         }
         _ => None,
     }
-}
-
-fn edit_flags(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    app: &mut App,
-) -> Result<()> {
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.show_cursor()?;
-    let path = crate::flags::flags_file();
-    if !path.exists() {
-        let _ = crate::flags::save(&crate::flags::load());
-    }
-    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".into());
-    let ok = std::process::Command::new(&editor)
-        .arg(&path)
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    if ok {
-        match std::fs::read_to_string(&path) {
-            Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
-                Ok(v) if v.is_object() => app.status = "Flags saved.".into(),
-                _ => app.status = "Invalid JSON: not an object.".into(),
-            },
-            Err(e) => app.status = format!("Could not read flags: {e}"),
-        }
-    } else {
-        app.status = format!("Editor exited: {editor}");
-    }
-    enable_raw_mode()?;
-    execute!(terminal.backend_mut(), EnterAlternateScreen, EnableMouseCapture)?;
-    terminal.clear()?;
-    Ok(())
 }
 
 pub fn run() -> Result<()> {
@@ -106,11 +75,6 @@ fn event_loop(
                     if let Some(mut s) = app.session.take() {
                         s.finish();
                     }
-                    return Ok(());
-                }
-                KeyAction::EditFlags => {
-                    edit_flags(terminal, app)?;
-                    event_loop(terminal, app)?;
                     return Ok(());
                 }
                 KeyAction::None => {}
