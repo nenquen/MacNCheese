@@ -35,4 +35,3 @@ clang -O2 -Wall -Wextra tests/darling_sparse_map_test.c shim/darling_sparse_map.
 "$test_build/sparse-map"
 clang -O2 -Wall -Wextra tests/ulock_compat_test.c -o "$test_build/ulock"
 "$test_build/ulock"
-PYTHONPATH=launcher python3 -m unittest discover -s tests -p '*_test.py'

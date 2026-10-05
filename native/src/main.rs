@@ -3,9 +3,15 @@
 //! shared with the frozen Python launcher through the same files.
 
 mod audio;
+mod display;
+mod flags;
+mod i18n;
+mod mods;
+mod patches;
 mod paths;
 mod session;
 mod settings;
+mod update;
 
 use anyhow::Result;
 use crossterm::{
@@ -26,9 +32,26 @@ use std::io;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
-const TABS: &[&str] = &["Play", "Settings", "Logs"];
+const TABS: &[&str] = &["Play", "Settings", "Flags", "Logs", "Setup"];
+
+fn app_uri() -> Option<String> {
+    std::env::args()
+        .skip(1)
+        .find(|a| !a.starts_with('-'))
+        .filter(|u| u.contains(':'))
+}
 
 fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("macncheese {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("Mac'n Cheese {} — Roblox on Linux through Darling", env!("CARGO_PKG_VERSION"));
+        println!("Usage: macncheese [--version|--help] [roblox-url]");
+        return Ok(());
+    }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -61,11 +84,28 @@ struct App {
     log_tail: Vec<String>,
     tx: Sender<StartMsg>,
     rx: Receiver<StartMsg>,
+    setup: SetupState,
+    setup_tx: Sender<SetupMsg>,
+    setup_rx: Receiver<SetupMsg>,
+}
+
+#[derive(Clone)]
+enum SetupState {
+    Idle,
+    Running(String),
+    Done(String),
+    Failed(String),
+}
+
+enum SetupMsg {
+    Progress(String),
+    Finished(Result<String, String>),
 }
 
 impl App {
     fn new() -> App {
         let (tx, rx) = mpsc::channel();
+        let (setup_tx, setup_rx) = mpsc::channel();
         App {
             tab: 0,
             settings: settings::load(),
@@ -78,6 +118,9 @@ impl App {
             log_tail: Vec::new(),
             tx,
             rx,
+            setup: SetupState::Idle,
+            setup_tx,
+            setup_rx,
         }
     }
 
@@ -114,7 +157,7 @@ impl App {
         let tx = self.tx.clone();
         let snapshot = self.settings.clone();
         std::thread::spawn(move || {
-            let _ = tx.send(match session::Session::start(&snapshot) {
+            let _ = tx.send(match session::Session::start(&snapshot, app_uri()) {
                 Ok(s) => StartMsg::Started(s),
                 Err(e) => StartMsg::Failed(e),
             });
@@ -131,6 +174,19 @@ impl App {
                 }
                 StartMsg::Failed(e) => {
                     self.status = format!("Could not start: {e}");
+                }
+            }
+        }
+        while let Ok(msg) = self.setup_rx.try_recv() {
+            match msg {
+                SetupMsg::Progress(text) => self.setup = SetupState::Running(text),
+                SetupMsg::Finished(Ok(text)) => {
+                    self.setup = SetupState::Done(text);
+                    self.status = "Setup complete.".into();
+                }
+                SetupMsg::Finished(Err(e)) => {
+                    self.setup = SetupState::Failed(e.clone());
+                    self.status = format!("Setup failed: {e}");
                 }
             }
         }
@@ -156,6 +212,58 @@ impl App {
         let lines: Vec<String> = text.lines().map(str::to_string).collect();
         let n = lines.len();
         self.log_tail = if n > 12 { lines[n - 12..].to_vec() } else { lines };
+    }
+
+    fn run_setup(&mut self) {
+        if matches!(self.setup, SetupState::Running(_)) {
+            return;
+        }
+        self.setup = SetupState::Running("Checking…".into());
+        let tx = self.setup_tx.clone();
+        std::thread::spawn(move || {
+            let say = |t: &str| {
+                let _ = tx.send(SetupMsg::Progress(t.into()));
+            };
+            let missing = session::missing_tools();
+            if !missing.is_empty() {
+                let _ = tx.send(SetupMsg::Finished(Err(format!(
+                    "Install these first: {}",
+                    missing.join(", ")
+                ))));
+                return;
+            }
+            if crate::update::installed_version().is_none() {
+                say("Contacting version service…");
+                let (version, upload) = match crate::update::latest_version() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let _ = tx.send(SetupMsg::Finished(Err(e)));
+                        return;
+                    }
+                };
+                say(&format!("Downloading Roblox {version}…"));
+                if let Err(e) = crate::update::update_roblox(&upload, &|f, m| {
+                    say(&format!("{m} ({:.0}%)", f * 100.0));
+                }) {
+                    let _ = tx.send(SetupMsg::Finished(Err(e)));
+                    return;
+                }
+            }
+            say("Building compatibility libraries…");
+            if !session::shim_built() {
+                if let Err(e) = session::build_shim() {
+                    let _ = tx.send(SetupMsg::Finished(Err(format!("Shim build failed:\n{e}"))));
+                    return;
+                }
+            }
+            say("Preparing prefix…");
+            if let Err(e) = session::prepare_prefix() {
+                let _ = tx.send(SetupMsg::Finished(Err(e)));
+                return;
+            }
+            apply_detected_scale();
+            let _ = tx.send(SetupMsg::Finished(Ok("Roblox is ready. Press Enter on Play.".into())));
+        });
     }
 
     fn refresh_logs(&mut self) {
@@ -270,7 +378,10 @@ impl Row {
     }
 }
 
-fn run<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+fn run(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &mut App,
+) -> Result<()> {
     app.refresh_logs();
     loop {
         app.tick();
@@ -287,6 +398,8 @@ fn run<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) 
                     KeyCode::Char('1') => app.tab = 0,
                     KeyCode::Char('2') => app.tab = 1,
                     KeyCode::Char('3') => app.tab = 2,
+                    KeyCode::Char('4') => app.tab = 3,
+                    KeyCode::Char('5') => app.tab = 4,
                     KeyCode::Tab => app.tab = (app.tab + 1) % TABS.len(),
                     KeyCode::Enter => {
                         if app.tab == 0 {
@@ -294,11 +407,18 @@ fn run<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) 
                         } else if app.tab == 1 {
                             rows()[app.settings_cursor].left(&mut app.settings);
                             app.save_settings();
+                        } else if app.tab == 4 {
+                            app.run_setup();
+                        }
+                    }
+                    KeyCode::Char('e') => {
+                        if app.tab == 2 {
+                            return edit_flags(terminal, app);
                         }
                     }
                     KeyCode::Up | KeyCode::Char('k') => match app.tab {
                         1 => app.settings_cursor = app.settings_cursor.saturating_sub(1),
-                        2 => {
+                        3 => {
                             let i = app.logs_state.selected().unwrap_or(0);
                             app.logs_state.select(Some(i.saturating_sub(1)));
                         }
@@ -306,7 +426,7 @@ fn run<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) 
                     },
                     KeyCode::Down | KeyCode::Char('j') => match app.tab {
                         1 => app.settings_cursor = (app.settings_cursor + 1).min(rows().len() - 1),
-                        2 => {
+                        3 => {
                             let i = app.logs_state.selected().unwrap_or(0);
                             if !app.logs.is_empty() {
                                 app.logs_state.select(Some((i + 1).min(app.logs.len() - 1)));
@@ -327,7 +447,7 @@ fn run<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) 
                         }
                     }
                     KeyCode::Char('r') => {
-                        if app.tab == 2 {
+                        if app.tab == 3 {
                             app.refresh_logs();
                         }
                     }
@@ -354,13 +474,17 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
     match app.tab {
         0 => render_play(f, app, chunks[1]),
         1 => render_settings(f, app, chunks[1]),
-        _ => render_logs(f, app, chunks[1]),
+        2 => render_flags(f, app, chunks[1]),
+        3 => render_logs(f, app, chunks[1]),
+        _ => render_setup(f, app, chunks[1]),
     }
 
     let hint = match app.tab {
-        0 => "Enter: play/stop · 1/2/3 tabs · q quit",
+        0 => "Enter: play/stop · 1-5 tabs · q quit",
         1 => "↑↓ move · ←→/Enter change · q quit",
-        _ => "↑↓ pick log · r refresh · q quit",
+        2 => "e: edit in $EDITOR · q quit",
+        3 => "↑↓ pick log · r refresh · q quit",
+        _ => "Enter: run setup · q quit",
     };
     let status = Paragraph::new(vec![
         Line::from(Span::styled(app.status.clone(), Style::default().fg(Color::Cyan))),
@@ -411,6 +535,88 @@ fn render_settings(f: &mut ratatui::Frame, app: &mut App, area: ratatui::layout:
         List::new(items).block(Block::default().borders(Borders::ALL).title("Settings")),
         area,
     );
+}
+
+fn render_flags(f: &mut ratatui::Frame, app: &mut App, area: ratatui::layout::Rect) {
+    let flags = crate::flags::load();
+    let mut lines = vec![Line::from(Span::styled(
+        format!("{} flags · press e to edit in $EDITOR", flags.len()),
+        Style::default().fg(Color::DarkGray),
+    ))];
+    let mut keys: Vec<&String> = flags.keys().collect();
+    keys.sort();
+    for key in keys.iter().take(60) {
+        let value = &flags[*key];
+        lines.push(Line::from(format!(
+            "{key} = {}",
+            value.as_str().unwrap_or("?")
+        )));
+    }
+    f.render_widget(
+        Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title("Fast flags")),
+        area,
+    );
+}
+
+fn render_setup(f: &mut ratatui::Frame, app: &mut App, area: ratatui::layout::Rect) {
+    let (state, color) = match &app.setup {
+        SetupState::Idle => ("Press Enter to check and install Roblox.".to_string(), Color::White),
+        SetupState::Running(step) => (format!("… {step}"), Color::Yellow),
+        SetupState::Done(msg) => (format!("✓ {msg}"), Color::Green),
+        SetupState::Failed(err) => (format!("✗ {err}"), Color::Red),
+    };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(state, Style::default().fg(color))))
+            .block(Block::default().borders(Borders::ALL).title("Setup")),
+        area,
+    );
+}
+
+/// Apply the detected desktop scale once (mirrors dpi_scale_auto).
+fn apply_detected_scale() {
+    let mut settings = settings::load();
+    let auto = settings.get("dpi_scale_auto").and_then(|v| v.as_bool()).unwrap_or(true);
+    if !auto {
+        return;
+    }
+    let detected = crate::display::validated_dpi_scale(crate::display::detect(&crate::display::Ctx::live()));
+    let current = settings.get("dpi_scale").and_then(|v| v.as_f64()).unwrap_or(1.0);
+    if (detected - current).abs() > 0.001 {
+        settings.insert("dpi_scale".into(), serde_json::Value::from(detected));
+        let _ = settings::save(&settings);
+    }
+}
+
+fn edit_flags<B: ratatui::backend::Backend + std::io::Write>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> Result<()> {
+    use std::io::Write as _;
+    use std::process::Command;
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+    let path = crate::flags::flags_file();
+    if !path.exists() {
+        let _ = crate::flags::save(&crate::flags::load());
+    }
+    let editor =
+        std::env::var("EDITOR").unwrap_or_else(|_| "nano".into());
+    let status = Command::new(&editor).arg(&path).status();
+    match status {
+        Ok(s) if s.success() => match std::fs::read_to_string(&path) {
+            Ok(text) => match serde_json::from_str::<serde_json::Value>(&text) {
+                Ok(v) if v.is_object() => app.status = "Flags saved.".into(),
+                _ => app.status = "Invalid JSON: not an object, kept old file.".into(),
+            },
+            Err(e) => app.status = format!("Could not read flags: {e}"),
+        },
+        _ => app.status = format!("Editor exited: {editor}"),
+    }
+    enable_raw_mode()?;
+    execute!(terminal.backend_mut(), EnterAlternateScreen)?;
+    terminal.clear()?;
+    Ok(())
 }
 
 fn render_logs(f: &mut ratatui::Frame, app: &mut App, area: ratatui::layout::Rect) {

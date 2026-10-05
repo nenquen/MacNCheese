@@ -510,16 +510,43 @@ do_install() {
     die "Build failed. See full log above or at: $INSTALL_LOG"
   fi
   say "Compatibility libraries built."
-  step 4 "Add the launcher to your desktop"
-  "$DIR/launcher/install.sh"
+  step 4 "Build and install the launcher"
+  say "Compiling the native TUI launcher (Rust, no Python)."
+  if ! command -v cargo >/dev/null; then
+    die "cargo is missing. Install Rust (rustup or your package manager) and run this again."
+  fi
+  if ! (cd "$DIR/native" && cargo build --release 2>&1 | tee -a "$INSTALL_LOG"); then
+    die "Launcher build failed. See full log at: $INSTALL_LOG"
+  fi
+  mkdir -p -- "$HOME/.local/bin"
+  install -m755 "$DIR/native/target/release/macncheese" "$HOME/.local/bin/macncheese"
+  mkdir -p -- "$DATA_HOME/applications"
+  sed "s|^Exec=.*|Exec=macncheese|; s|^Icon=.*|Icon=macncheese|" \
+    "$DIR/packaging/org.macncheese.MacNCheese.desktop" \
+    > "$DATA_HOME/applications/org.macncheese.MacNCheese.desktop"
+  sed "s|^Exec=.*|Exec=macncheese %u|; s|^Icon=.*|Icon=macncheese|" \
+    "$DIR/packaging/org.macncheese.MacNCheese.URI.desktop" \
+    > "$DATA_HOME/applications/org.macncheese.MacNCheese.URI.desktop"
+  for size in 16 22 24 32 48 64 128 256 512; do
+    install -Dm644 "$DIR/branding/icons/macncheese-$size.png" \
+      "$DATA_HOME/icons/hicolor/${size}x${size}/apps/macncheese.png"
+  done
+  # Leftover Python launcher entries.
+  rm -f -- "$DATA_HOME/applications/org.macncheese.MacNCheese.Studio.desktop"
+  local old_link=$HOME/.local/bin/macncheese
+  if [[ -L $old_link && $(readlink "$old_link") == */macncheese-launcher ]]; then
+    rm -f -- "$old_link"
+    install -m755 "$DIR/native/target/release/macncheese" "$HOME/.local/bin/macncheese"
+  fi
+  update-desktop-database "$DATA_HOME/applications" >/dev/null 2>&1 || true
   setup_success
 }
 
 # ---------------------------------------------------------------- uninstall
 
 # The checkout this script makes: nothing is deleted unless $DIR is one.
-is_installed() { [[ -f $DIR/launcher/macncheese-launcher && -f $DIR/build_debug_shim.sh ]]; }
-installed_version() { sed -n 's/^__version__ = "\(.*\)"/\1/p' "$DIR/launcher/macncheese/__init__.py" 2>/dev/null; }
+is_installed() { [[ -x $HOME/.local/bin/macncheese && -f $DIR/build_debug_shim.sh ]]; }
+installed_version() { sed -n 's/^version = "\(.*\)"/\1/p' "$DIR/native/Cargo.toml" 2>/dev/null | head -1; }
 
 # Removes what do_install and the launcher put on this computer; with an
 # argument, Darling's prefix as well. Darling and the other packages stay.
@@ -553,6 +580,9 @@ do_uninstall() {
     "$DATA_HOME/mime/packages/xyz.narez.MacOBlox.xml"
   local link=$HOME/.local/bin/macncheese
   if [[ -L $link && $(readlink "$link") == */macncheese-launcher ]]; then
+    rm -f -- "$link"
+  elif [[ -f $link ]] && "$link" --version 2>/dev/null | grep -q "macncheese"; then
+    # Native binary installed by step 4.
     rm -f -- "$link"
   fi
   # Leftover command and icon names from MacOBlox installs.

@@ -42,10 +42,9 @@ modules:
       - clang -target x86_64-apple-darwin -fuse-ld=lld -isysroot /app/libexec/darling -mmacosx-version-min=11.0
         -dynamiclib -O2 -o /app/lib/macncheese/launchd_pid1.dylib flatpak/launchd_pid1.c
       - install -d /app/share/macncheese
-      - cp -r launcher branding /app/share/macncheese/
-      - rm -f /app/share/macncheese/launcher/install.sh
-      - python3 -m compileall -q -d /app/share/macncheese/launcher /app/share/macncheese/launcher
-      - install -Dm755 flatpak/macncheese.sh /app/bin/macncheese
+      - cp -r branding shim frameworks build_debug_shim.sh native /app/share/macncheese/
+      - cd /app/share/macncheese/native && cargo build --release --offline || cargo build --release
+      - install -Dm755 /app/share/macncheese/native/target/release/macncheese /app/bin/macncheese
       - for size in 16 22 24 32 48 64 128 256 512; do install -Dm644 branding/icons/macncheese-$size.png
         /app/share/icons/hicolor/${size}x${size}/apps/org.macncheese.MacNCheese.png; done
       # Also as "macncheese", the name the launcher gives its windows (only

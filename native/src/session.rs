@@ -308,6 +308,7 @@ pub struct Session {
 impl Session {
     pub fn start(
         settings: &serde_json::Map<String, serde_json::Value>,
+        launch_uri: Option<String>,
     ) -> Result<Session, String> {
         let missing = missing_tools();
         if !missing.is_empty() {
@@ -319,6 +320,9 @@ impl Session {
         let t0 = Instant::now();
         prepare_prefix()?;
         let prefix_took = t0.elapsed().as_secs_f32();
+        crate::flags::ensure_raknet();
+        crate::update::ensure_launch_patches();
+        crate::mods::apply(settings);
 
         let mut vars = shim_variables(settings);
         let audio = Audio::start();
@@ -378,7 +382,7 @@ impl Session {
             "macncheese".to_string(),
             format!("/Volumes/SystemRoot{}", data.display()),
             format!("/Volumes/SystemRoot{}", shim_parent.display()),
-            String::new(),
+            launch_uri.unwrap_or_default(),
         ];
         command.extend(vars);
         let log_file = std::fs::File::create(&log_path).map_err(|e| format!("log: {e}"))?;
