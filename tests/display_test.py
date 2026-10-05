@@ -132,3 +132,67 @@ class DisplayTests(unittest.TestCase):
         self.assertEqual(guest["VK_ADD_DRIVER_FILES"], host["VK_ADD_DRIVER_FILES"])
         self.assertEqual(host["EGL_PLATFORM"], "wayland")
         self.assertEqual(guest["EGL_PLATFORM"], "wayland")
+
+
+class DetectSystemScaleTests(unittest.TestCase):
+    def detect(self, env=None, outputs=None, files=None):
+        outputs = outputs or {}
+        files = files or {}
+        def run(cmd, timeout=5):
+            if cmd[0] not in outputs:
+                raise OSError("missing: " + cmd[0])
+            return outputs[cmd[0]]
+        def read(path):
+            if str(path) not in files:
+                raise OSError("missing file")
+            return files[str(path)]
+        return display.detect_system_scale(env=env or {}, run=run, read=read)
+
+    def test_unknown_setup_returns_default(self):
+        self.assertEqual(self.detect(), 1.0)
+
+    def test_env_override_wins(self):
+        self.assertEqual(self.detect(env={"GDK_SCALE": "2"}), 2.0)
+        self.assertEqual(self.detect(env={"QT_SCREEN_SCALE_FACTORS": "DP-1=1.25;HDMI=2"}), 2.0)
+        self.assertEqual(self.detect(env={"GDK_SCALE": "9"}), 1.0)
+
+    def test_kde_kscreen_output(self):
+        out = "Output: 1 DP-1\n Scale: 1.25\nOutput: 2 HDMI\n Scale: 1\n"
+        self.assertEqual(self.detect(env={"XDG_CURRENT_DESKTOP": "KDE"},
+                                     outputs={"kscreen-doctor": out}), 1.25)
+
+    def test_kde_falls_back_to_kwinoutputconfig(self):
+        home = str(Path.home() / ".config" / "kwinoutputconfig.json")
+        files = {home: json.dumps({"outputs": [{"scale": 1.5}, {"scale": 1.0}]})}
+        self.assertEqual(self.detect(env={"XDG_CURRENT_DESKTOP": "KDE"},
+                                     files=files), 1.5)
+
+    def test_gnome_monitors_xml(self):
+        home = str(Path.home() / ".config" / "monitors.xml")
+        xml = ("<monitors><configuration><logicalmonitor>"
+               "<scale>1.25</scale></logicalmonitor></configuration></monitors>")
+        self.assertEqual(self.detect(env={"XDG_CURRENT_DESKTOP": "GNOME"},
+                                     outputs={"gsettings": "uint32 1"},
+                                     files={home: xml}), 1.25)
+
+    def test_gnome_falls_back_to_scaling_factor(self):
+        self.assertEqual(self.detect(env={"XDG_CURRENT_DESKTOP": "GNOME"},
+                                     outputs={"gsettings": "uint32 2"}), 2.0)
+
+    def test_xft_dpi_fallback(self):
+        self.assertEqual(self.detect(outputs={"xrdb": "Xft.dpi:\t120\n"}), 1.25)
+        self.assertEqual(self.detect(outputs={"xrdb": "Xft.dpi:\t96\n"}), 1.0)
+
+    def test_never_raises(self):
+        def boom(*args, **kwargs):
+            raise RuntimeError("broken")
+        self.assertEqual(display.detect_system_scale(env={}, run=boom, read=boom), 1.0)
+
+    def test_auto_flag_survives_settings_roundtrip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings_file = Path(directory) / "settings.json"
+            with patch.object(core, "SETTINGS_FILE", settings_file):
+                settings_file.write_text(json.dumps({"dpi_scale_auto": False}))
+                loaded = core.load_settings()
+                self.assertFalse(loaded["dpi_scale_auto"])
+                self.assertTrue(core.DEFAULT_SETTINGS["dpi_scale_auto"])

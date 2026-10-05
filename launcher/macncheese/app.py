@@ -1062,14 +1062,17 @@ class SettingsPage(Adw.Bin):
             "display_backend", backend_codes[row.get_selected()]))
         game.add(backend)
 
-        from .display import validated_dpi_scale
-        ui_scale = Adw.SpinRow.new_with_range(100, 400, 25)
+        from .display import detect_system_scale, validated_dpi_scale
+        ui_scale = Adw.SpinRow.new_with_range(100, 400, 5)
         ui_scale.set_digits(0)
         ui_scale.set_title(_("Roblox UI scale"))
-        ui_scale.set_subtitle(_("100–400%. Applies on next launch."))
+        detected_percent = round(detect_system_scale() * 100)
+        ui_scale.set_subtitle(_("100–400% in 5% steps. System reports {percent}%. Applies on next launch.").format(percent=detected_percent) if detected_percent != 100 else _("100–400% in 5% steps. Applies on next launch."))
         ui_scale.set_value(validated_dpi_scale(settings.get("dpi_scale", 1.0)) * 100)
-        ui_scale.connect("notify::value", lambda row, _pspec: window.set_setting(
-            "dpi_scale", validated_dpi_scale(row.get_value() / 100)))
+        def _ui_scale_changed(row, _pspec):
+            window.set_setting("dpi_scale", validated_dpi_scale(row.get_value() / 100))
+            window.set_setting("dpi_scale_auto", False)
+        ui_scale.connect("notify::value", _ui_scale_changed)
         game.add(ui_scale)
 
         mangohud = Adw.SwitchRow(
@@ -2132,6 +2135,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.content_stack.set_visible_child_name("launcher")
 
     def complete_setup(self, launch=False):
+        if self.settings.get("dpi_scale_auto", True):
+            from .display import detect_system_scale, validated_dpi_scale
+            detected = validated_dpi_scale(detect_system_scale())
+            if detected != self.settings.get("dpi_scale", 1.0):
+                self.set_setting("dpi_scale", detected)
         self.set_setting("setup_complete", True)
         self.dismiss_setup()
         self.stack.set_visible_child_name("play")

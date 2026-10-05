@@ -320,3 +320,25 @@ def resolve_a(host, provider="quad9", timeout=5):
             addresses.append(socket.inet_ntoa(response[offset:offset + 4]))
         offset += length
     return addresses
+
+
+def warmup(provider="quad9", custom=""):
+    """Resolve the hosts Roblox needs first in the background, so the game's
+    opening DNS burst does not pay for the first TLS handshake. Daemon
+    thread; failures are silent (the game path is unchanged)."""
+    import threading
+    if provider == "custom" and not custom:
+        provider = "system"
+    if provider == "system":
+        return
+    hosts = ("clientsettingscdn.roblox.com", "setup.rbxcdn.com",
+             "thumbnails.roblox.com", "games.roblox.com")
+
+    def _prefetch():
+        for host in hosts:
+            try:
+                resolve_a(host, provider, timeout=4)
+            except OSError:
+                break
+
+    threading.Thread(target=_prefetch, name="dns-warmup", daemon=True).start()

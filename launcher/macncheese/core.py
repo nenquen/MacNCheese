@@ -86,6 +86,7 @@ DEFAULT_SETTINGS = {
     "raw_mouse": True,
     "display_backend": "x11",
     "dpi_scale": 1.0,
+    "dpi_scale_auto": True,
     "renderer": "opengl",
     "mangohud": False,
     "hide_menu_bar": False,
@@ -383,6 +384,7 @@ def update_roblox(upload, progress=None):
     apply_throttle_patch()
     ensure_raknet_transport()
     ensure_shader_compatibility()
+    mark_client_patches()
     if progress:
         progress(1.0, _("Done"))
     return backup if had_bundle else None
@@ -422,6 +424,46 @@ def remove_throttle_patch():
     return run_throttle_patcher("--undo")
 
 
+PATCH_STAMP = CACHE_DIR / "client-patches.json"
+
+
+def _read_patch_stamp():
+    try:
+        stamp = json.loads(PATCH_STAMP.read_text())
+    except (OSError, ValueError):
+        return {}
+    return stamp if isinstance(stamp, dict) else {}
+
+
+def client_patches_current():
+    """True when this exact client build already went through the binary
+    scans (throttle, RakNet transport, shader pack) with the current
+    settings: rescanning every launch costs ~1 s of full-binary reads for
+    nothing. Anything that changes the outcome (client update, toggling the
+    throttle patch) invalidates the stamp."""
+    version = installed_version()
+    if not version:
+        return False
+    stamp = _read_patch_stamp()
+    return (stamp.get("version") == version
+            and stamp.get("auto_patch_throttle")
+            == load_settings().get("auto_patch_throttle", True)
+            and stamp.get("done") is True)
+
+
+def mark_client_patches():
+    """Remember that the current client build was fully scanned."""
+    try:
+        PATCH_STAMP.parent.mkdir(parents=True, exist_ok=True)
+        PATCH_STAMP.write_text(json.dumps({
+            "version": installed_version(),
+            "auto_patch_throttle": load_settings().get("auto_patch_throttle", True),
+            "done": True,
+        }))
+    except OSError:
+        pass
+
+
 def apply_throttle_patch():
     """Re-apply the startup-throttle patch to the client binary (see
     patch_startup_throttle.py at the project root).
@@ -446,10 +488,13 @@ def apply_throttle_patch():
     # "already disabled" stays silent.
 
 
-def ensure_raknet_transport():
+def ensure_raknet_transport(binary=True):
     """Ensure FastFlags in ClientAppSettings.json and the client binary disable
     RbxTransport (QUIC) and enforce RakNet. Under Darling, RbxTransport fails socket
-    connection, causing an ~11 s freeze before Roblox disconnects with Error 256."""
+    connection, causing an ~11 s freeze before Roblox disconnects with Error 256.
+
+    The flag part is cheap JSON and always runs; the binary scan is skipped
+    on repeat launches (see client_patches_current)."""
     try:
         flags = load_fast_flags()
         needed = {
@@ -503,10 +548,12 @@ def ensure_raknet_transport():
         if changed:
             save_fast_flags(flags)
 
-        binary = APP_BUNDLE / "Contents" / "MacOS" / "RobloxPlayer"
-        if binary.is_file():
+        if not binary:
+            return
+        client_binary = APP_BUNDLE / "Contents" / "MacOS" / "RobloxPlayer"
+        if client_binary.is_file():
             from .transport_patches import apply_transport_patch
-            status = apply_transport_patch(binary)
+            status = apply_transport_patch(client_binary)
             if status.startswith("unsupported"):
                 logging.getLogger("macncheese").warning("RakNet compatibility: %s", status)
             elif status == "patched":
@@ -1772,26 +1819,39 @@ class RobloxSession:
         if leftover:
             _terminate_roblox(leftover, wait=3)
         orphans = clear_orphaned_darling()
+        phase_started = time.monotonic()
         prepare_prefix(env)
+        prepare_prefix_took = time.monotonic() - phase_started
         try:
             from . import mods
             mods.apply_mods(self.settings)
         except Exception as e:
             logging.getLogger("macncheese").warning("Failed to apply mods: %s", e)
-        apply_throttle_patch()
-        ensure_raknet_transport()
-        ensure_shader_compatibility()
+        phase_started = time.monotonic()
+        if client_patches_current():
+            ensure_raknet_transport(binary=False)
+            patches_note = "client binary patches up to date, rescans skipped"
+        else:
+            apply_throttle_patch()
+            ensure_raknet_transport()
+            ensure_shader_compatibility()
+            mark_client_patches()
+            patches_note = "client binary patches verified"
+        patches_took = time.monotonic() - phase_started
         provider = self.settings.get("dns", "system")
         if provider != "system" and (provider != "custom" or self.settings.get("dns_custom")):
-            from .dns import DnsForwarder
+            from .dns import DnsForwarder, warmup as dns_warmup
             self.dns = DnsForwarder(provider, self.settings.get("dns_custom", ""))
+            dns_warmup(provider, self.settings.get("dns_custom", ""))
         self.audio = HostAudio.start()
         clear_stale_darling()
+        phase_started = time.monotonic()
         if not darlingserver_running():
             # The first process after darlingserver starts sometimes fails to
             # check in; warm the server up with a trivial command first.
             subprocess.run(["darling", "shell", "true"], env=env, stdin=subprocess.DEVNULL,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
+        warmup_took = time.monotonic() - phase_started
         LOGS.mkdir(parents=True, exist_ok=True)
         # The Mesa shader cache dir must exist before the game opens it.
         (CACHE_DIR / "mesa-shader-cache").mkdir(parents=True, exist_ok=True)
@@ -1804,6 +1864,8 @@ class RobloxSession:
             log.write(f"Mac'n Cheese {__version__}\n".encode())
             log.write(f"Darling: {darling_version(env)}\n".encode())
             log.write(f"Renderer requested: {renderer_name}\n".encode())
+            log.write(f"Prefix preparation took {prepare_prefix_took:.1f} s; {patches_note} "
+                      f"({patches_took:.1f} s); Darling warmup took {warmup_took:.1f} s\n".encode())
             if leftover:
                 log.write(f"Requested cleanup of {len(leftover)} selected-prefix Roblox process(es) of an earlier game\n".encode())
             if orphans:
