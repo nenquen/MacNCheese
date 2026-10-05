@@ -825,7 +825,11 @@ fn title_block(pal: &crate::theme::Palette, title: &str) -> Block<'static> {
         .borders(Borders::ALL)
         .border_style(ratatui::style::Style::default().fg(pal.border))
         .style(ratatui::style::Style::default().bg(pal.bg))
-        .title(title.to_string())
+        .title(if title.is_empty() {
+            String::new()
+        } else {
+            format!(" {title} ")
+        })
 }
 
 pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
