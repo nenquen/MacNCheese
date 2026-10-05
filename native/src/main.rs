@@ -4,6 +4,7 @@
 //! (click tabs, buttons, rows) and every action has a keyboard twin.
 
 mod audio;
+mod desktop_entry;
 mod display;
 mod flags;
 mod gui;

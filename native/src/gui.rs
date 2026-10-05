@@ -274,6 +274,7 @@ impl ApplicationHandler for Gui {
 }
 
 pub fn run() -> anyhow::Result<()> {
+    crate::desktop_entry::ensure_menu_entry();
     let event_loop = EventLoop::new()?;
     let mut gui = Gui {
         window: None,

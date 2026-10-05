@@ -9,5 +9,6 @@ Exec=macncheese
 Icon=macncheese
 Terminal=false
 Categories=Game;
+StartupWMClass=org.macncheese.MacNCheese
 Keywords=roblox;darling;
 StartupNotify=true
