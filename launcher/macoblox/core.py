@@ -1067,7 +1067,9 @@ SHIM_STAMP = BUILD_DIR / "sources.sha256"
 def _shim_sources_hash():
     """Hash of everything the shim build uses, and of the launcher version."""
     digest = hashlib.sha256(__version__.encode())
-    for path in sorted([*PROJECT.glob("*.c"), *PROJECT.glob("*.cpp"), *PROJECT.glob("*.m"), *PROJECT.glob("*.h"),
+    for path in sorted([*(PROJECT / "shim").glob("*.c"), *(PROJECT / "shim").glob("*.cpp"),
+                        *(PROJECT / "shim").glob("*.m"), *(PROJECT / "shim").glob("*.h"),
+                        *(PROJECT / "shim").glob("*.S"),
                         *(PROJECT / "frameworks").glob("*"), BUILD_SCRIPT]):
         try:
             digest.update(path.name.encode() + b"\0" + path.read_bytes())

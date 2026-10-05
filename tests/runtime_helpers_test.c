@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
-#include "../shim_lock.h"
-#include "../worker_wake.h"
+#include "../shim/shim_lock.h"
+#include "../shim/worker_wake.h"
 
 static volatile unsigned int lock;
 static unsigned long count;

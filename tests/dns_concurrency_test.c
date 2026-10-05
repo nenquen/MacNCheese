@@ -11,7 +11,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include "../dns_concurrency.h"
+#include "../shim/dns_concurrency.h"
 
 struct fake_state { unsigned int id, query_count; void *allocation; };
 _Static_assert(sizeof(struct fake_state) <= sizeof(union macoblox_resolver_state), "mock fits");

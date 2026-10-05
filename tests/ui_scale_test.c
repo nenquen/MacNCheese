@@ -21,7 +21,7 @@ static const char *method_getTypeEncoding(Method);
 static IMP method_getImplementation(Method);
 static IMP method_setImplementation(Method, IMP);
 static void write_str(const char *);
-#include "../ui_scale_hook.h"
+#include "../shim/ui_scale_hook.h"
 
 static const char *encoding = "{Settings=^vfiiiB^vBII}16@0:8";
 static double requested = 2;

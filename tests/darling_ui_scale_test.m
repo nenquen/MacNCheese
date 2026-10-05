@@ -7,7 +7,7 @@
  *   -framework AppKit -framework Foundation -o /tmp/macoblox-ui-scale-native
  * Inject the shim, set MACOBLOX_DPI_SCALE=1 or 2, and pass the same integer.
  */
-#include "../ui_scale.h"
+#include "../shim/ui_scale.h"
 extern int printf(const char *, ...), fflush(void *), memcmp(const void *, const void *, unsigned long);
 extern void *memset(void *, int, unsigned long);
 extern unsigned int alarm(unsigned int);

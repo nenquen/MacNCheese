@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../graphics_context.h"
+#include "../shim/graphics_context.h"
 
 static __thread void *cgl_current;
 static __thread void *egl_current;

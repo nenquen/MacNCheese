@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# C/Objective-C shim sources live in shim/; entry scripts stay at the root.
+src_dir="$project_dir/shim"
 # Output goes to MACOBLOX_BUILD_DIR when the sources are read-only (a package).
 build_dir=${MACOBLOX_BUILD_DIR:-$project_dir/build}
 # Packages put Darling's macOS root in /usr/libexec, a source build in /usr/local.
@@ -12,7 +14,7 @@ if pkg-config --exists sdl2 wayland-client wayland-egl wayland-cursor; then
   wayland_output=$(mktemp "$build_dir/.wayland.XXXXXX")
   if clang++ -std=c++17 -O2 -fPIC -shared -pthread \
       $(pkg-config --cflags sdl2 wayland-client wayland-egl wayland-cursor) \
-      "$project_dir/wayland_host.cpp" \
+      "$src_dir/wayland_host.cpp" \
       $(pkg-config --libs sdl2 wayland-client wayland-egl wayland-cursor) \
       -o "$wayland_output"; then
     chmod 755 "$wayland_output"
@@ -30,7 +32,7 @@ trap 'rm -f -- "$tmp_output"' EXIT
 # Memory/string functions replacing Darling's unoptimized ones: -O2 and no
 # builtins, compiled on their own (see fast_libc.c).
 clang -target x86_64-apple-darwin -isysroot "$sysroot" -mmacosx-version-min=11.0 \
-  -O2 -fno-builtin -c "$project_dir/fast_libc.c" -o "$build_dir/fast_libc.o"
+  -O2 -fno-builtin -c "$src_dir/fast_libc.c" -o "$build_dir/fast_libc.o"
 # Newer clang compiles Objective-C literals (@1, @[], @{}) to constant objects
 # of classes Darling's runtime does not have; -fno-objc-constant-literals turns
 # that off. Older clang (22 and before) has neither the feature nor the flag
@@ -44,7 +46,7 @@ clang -target x86_64-apple-darwin -fuse-ld=lld \
   -O2 -fno-omit-frame-pointer -dynamiclib -fno-objc-arc $objc_literal_flag -Werror=incompatible-function-pointer-types \
   -Wl,-undefined,dynamic_lookup \
   -install_name @rpath/libMacOBloxShims.dylib \
-  "$project_dir/libMacOBloxShims.m" "$project_dir/xattr_compat.c" "$project_dir/exit_compat.c" "$project_dir/missing_symbols.c" "$project_dir/net_trace.c" "$project_dir/darling_fixes.c" "$project_dir/thread_kick.c" "$project_dir/xfixes_raw.c" "$project_dir/raw_mouse.c" "$project_dir/cursor_overlay.c" "$project_dir/worker_wake.c" "$project_dir/shader_compat.c" "$project_dir/mangohud_bridge.c" "$project_dir/dns_override.c" "$project_dir/audio_hal.c" "$project_dir/gpu_info.c" "$project_dir/power_info.c" "$project_dir/layer_image.c" "$project_dir/gl_profile.c" "$project_dir/graphics_context.c" "$project_dir/wayland_appkit.m" "$project_dir/connectx_compat.c" "$project_dir/memory_stats.c" "$project_dir/web_bridge.m" "$build_dir/fast_libc.o" \
+  "$src_dir/libMacOBloxShims.m" "$src_dir/xattr_compat.c" "$src_dir/exit_compat.c" "$src_dir/missing_symbols.c" "$src_dir/net_trace.c" "$src_dir/darling_fixes.c" "$src_dir/thread_kick.c" "$src_dir/xfixes_raw.c" "$src_dir/raw_mouse.c" "$src_dir/cursor_overlay.c" "$src_dir/worker_wake.c" "$src_dir/shader_compat.c" "$src_dir/mangohud_bridge.c" "$src_dir/dns_override.c" "$src_dir/audio_hal.c" "$src_dir/gpu_info.c" "$src_dir/power_info.c" "$src_dir/layer_image.c" "$src_dir/gl_profile.c" "$src_dir/graphics_context.c" "$src_dir/wayland_appkit.m" "$src_dir/connectx_compat.c" "$src_dir/memory_stats.c" "$src_dir/web_bridge.m" "$build_dir/fast_libc.o" \
   -lobjc -lc++ -lc++abi -framework Foundation -framework AppKit -framework WebKit -framework Metal \
   -o "$tmp_output"
 chmod 755 "$tmp_output"
