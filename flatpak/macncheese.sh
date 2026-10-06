@@ -10,6 +10,6 @@ export MACNCHEESE_PREBUILT_SHIM=/app/lib/macncheese/shim
 mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/macncheese/logs" 2>/dev/null
 {
   echo "--- $(date '+%F %T') pid=$$ args=$*"
-  env | grep -E '^(MACNCHEESE|DPREFIX|PATH)=' | sed 's/^/    /'
+  env | grep -E '^(MACNCHEESE|DPREFIX|PATH)' | sed 's/^/    /'
 } >> "${XDG_DATA_HOME:-$HOME/.local/share}/macncheese/logs/launcher-env.log" 2>/dev/null
 exec /app/lib/macncheese/macncheese "$@"

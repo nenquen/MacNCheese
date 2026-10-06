@@ -278,7 +278,10 @@ impl App {
         std::thread::spawn(move || {
             let _ = tx.send(match session::Session::start(&snapshot, app_uri()) {
                 Ok(s) => StartMsg::Started(s),
-                Err(e) => StartMsg::Failed(e),
+                Err(e) => {
+                    session::log_line(&format!("start failed: {e}"));
+                    StartMsg::Failed(e)
+                }
             });
         });
     }

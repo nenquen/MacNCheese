@@ -91,7 +91,7 @@ pub fn missing_tools() -> Vec<String> {
 
 /// Append a diagnostics line to logs/session.log — launch mysteries
 /// otherwise end up as screenshot archaeology.
-fn log_line(msg: &str) {
+pub(crate) fn log_line(msg: &str) {
     let dir = paths::data_dir().join("logs");
     if std::fs::create_dir_all(&dir).is_err() {
         return;
@@ -234,6 +234,7 @@ fn darlingserver_running() -> bool {
 fn darling_shutdown() {
     let _ = Command::new("darling")
         .arg("shutdown")
+        .envs(base_env(false))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -266,6 +267,16 @@ pub fn prepare_prefix() -> Result<(), String> {
 
 fn base_env(wayland: bool) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = std::env::vars().collect();
+    // The Flatpak cannot carry the setuid bit, so `darling` refuses to
+    // start unless the fake-root library stands in for root (only
+    // darling/darlingserver act on it; other roles pass through, see
+    // flatpak/darling-noroot.c). On the host the setuid bit exists and
+    // the loader ignores LD_PRELOAD for it anyway.
+    if let Ok(pre) = std::env::var("MACNCHEESE_NOROOT_LIB") {
+        if !pre.is_empty() && std::path::Path::new(&pre).is_file() {
+            env.insert("LD_PRELOAD".into(), pre);
+        }
+    }
     if wayland {
         env.insert("EGL_PLATFORM".into(), "wayland".into());
         env.remove("DISPLAY");
