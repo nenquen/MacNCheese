@@ -1,4 +1,5 @@
-//! Mac'n Cheese TUI: Play | Settings | Flags | Logs (+ Setup on first run).
+//! Mac'n Cheese TUI: Play | Settings | Flags | Logs (+ Setup while the
+//! Roblox client is missing, Sober-style onboarding).
 //!
 //! Lite by design: one file, no GTK, no Python. Mouse works like a GUI
 //! (click tabs, buttons, rows) and every action has a keyboard twin.
@@ -177,12 +178,11 @@ impl App {
         let (setup_tx, setup_rx) = mpsc::channel();
         let (update_tx, update_rx) = mpsc::channel();
         let settings = settings::load();
-        let done = settings.get("setup_complete").and_then(|v| v.as_bool()).unwrap_or(false);
-        let tabs = if done {
-            vec![Tab::Play, Tab::Settings, Tab::Flags, Tab::Logs]
-        } else {
-            vec![Tab::Play, Tab::Settings, Tab::Flags, Tab::Logs, Tab::Setup]
-        };
+        let needed = Self::setup_needed(&settings);
+        let mut tabs = vec![Tab::Play, Tab::Settings, Tab::Flags, Tab::Logs];
+        if needed {
+            tabs.push(Tab::Setup);
+        }
         let mut app = App {
             tabs,
             tab: 0,
@@ -209,13 +209,41 @@ impl App {
             update_rx,
             clicks: Vec::new(),
         };
-        // First run: open Setup with an explanation. Nothing runs
-        // until the user confirms (yes/no).
-        if !done {
+        // Open Setup when consent is missing or the client isn't on
+        // disk — Sober-style, prompt until Roblox is present.
+        if needed {
             app.tab = app.tabs.iter().position(|t| *t == Tab::Setup).unwrap_or(0);
         }
         app.spawn_update_check();
         app
+    }
+
+    /// Setup shows until the user consented AND the client is on disk;
+    /// a missing Roblox always brings the tab back.
+    fn setup_needed(settings: &Map<String, Value>) -> bool {
+        let consent = settings
+            .get("setup_complete")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        !consent || update::installed_version().is_none()
+    }
+
+    /// Keep the tab list in sync with the client state (setup finished).
+    fn sync_tabs(&mut self) {
+        let needed = Self::setup_needed(&self.settings);
+        let has = self.tabs.contains(&Tab::Setup);
+        if needed && !has {
+            self.tabs.push(Tab::Setup);
+        } else if !needed && has {
+            let idx = self.tabs.iter().position(|t| *t == Tab::Setup).unwrap();
+            self.tabs.remove(idx);
+            if self.tab > idx {
+                self.tab -= 1;
+            }
+            if self.tab >= self.tabs.len() {
+                self.tab = 0;
+            }
+        }
     }
 
     fn save_settings(&self) {
@@ -236,6 +264,11 @@ impl App {
         }
         if update::installed_version().is_none() {
             self.status = "Roblox is not installed — run Setup first.".into();
+            // Jump to Setup (it is always listed while the client is
+            // missing), the same prompt-when-absent flow Sober uses.
+            if let Some(i) = self.tabs.iter().position(|t| *t == Tab::Setup) {
+                self.tab = i;
+            }
             return;
         }
         self.starting = true;
@@ -309,10 +342,11 @@ impl App {
             settings.insert("setup_complete".into(), Value::Bool(true));
             let _ = settings::save(&settings);
             self.settings = settings;
-            // Setup never shows again: drop the tab, go Play.
-            self.tabs.retain(|t| *t != Tab::Setup);
             self.tab = 0;
         }
+        // Setup disappears once consented + installed, and reappears
+        // any time the client goes missing.
+        self.sync_tabs();
     }
 
     // -- update check ----------------------------------------------
@@ -783,7 +817,7 @@ fn main() -> Result<()> {
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!("Mac'n Cheese {} — Roblox on Linux through Darling", env!("CARGO_PKG_VERSION"));
         println!("Usage: macncheese [--version|--help|--tui] [roblox-url]");
-        println!("Keys: 1-5 tabs · arrows/hjkl move · Enter activate · e edit flags · q quit.");
+        println!("Keys: number keys switch tabs · arrows/hjkl move · Enter activate · e edit flags · q quit.");
         println!("Mouse: click tabs, buttons and rows.");
         return Ok(());
     }
@@ -1249,11 +1283,32 @@ mod tui_tests {
     }
 
     #[test]
-    fn setup_tab_hidden_when_done() {
+    fn setup_needed_without_consent() {
+        let no_consent: Map<String, Value> = Map::new();
+        assert!(App::setup_needed(&no_consent), "no consent -> setup");
+        let mut consented = Map::new();
+        consented.insert("setup_complete".into(), Value::Bool(true));
+        assert_eq!(
+            App::setup_needed(&consented),
+            update::installed_version().is_none(),
+            "after consent setup shows only while the client is missing"
+        );
+    }
+
+    #[test]
+    fn consented_but_client_missing_keeps_setup_tab() {
+        if update::installed_version().is_some() {
+            return; // hide-branch needs a real client; nothing to assert
+        }
         let mut app = App::new();
         app.settings.insert("setup_complete".into(), Value::Bool(true));
-        app.tabs.retain(|t| *t != Tab::Setup);
+        app.sync_tabs();
+        assert!(
+            app.tabs.contains(&Tab::Setup),
+            "missing client must keep Setup visible"
+        );
+        app.tab = app.tabs.iter().position(|t| *t == Tab::Setup).unwrap();
         let text = drawn(&mut app);
-        assert!(!text.contains("Setup"), "setup tab should be gone");
+        assert!(text.contains("Setup"), "setup tab should render");
     }
 }
