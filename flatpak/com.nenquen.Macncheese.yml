@@ -45,7 +45,7 @@ modules:
         -dynamiclib -O2 -o /app/lib/macncheese/launchd_pid1.dylib flatpak/launchd_pid1.c
       - install -d /app/share/macncheese
       - cp -r branding shim frameworks build_debug_shim.sh native /app/share/macncheese/
-      - mkdir -p .cargo && cp cargo/config .cargo/config.toml && CARGO_BUILD_JOBS=4 cargo build --release --offline --manifest-path /app/share/macncheese/native/Cargo.toml && install -Dm755 native/target/release/macncheese /app/lib/macncheese/macncheese
+      - mkdir -p .cargo && cp cargo/config .cargo/config.toml && CARGO_BUILD_JOBS=4 cargo build --release --offline --manifest-path /app/share/macncheese/native/Cargo.toml && install -Dm755 /app/share/macncheese/native/target/release/macncheese /app/lib/macncheese/macncheese && rm -rf /app/share/macncheese/native/target
       - install -Dm755 flatpak/macncheese.sh /app/bin/macncheese
       - for size in 16 22 24 32 48 64 128 256 512; do install -Dm644 branding/icons/macncheese-$size.png
         /app/share/icons/hicolor/${size}x${size}/apps/com.nenquen.Macncheese.png; done
@@ -84,6 +84,7 @@ modules:
           - .flatpak-builder
           - flatpak/build-dir
           - flatpak/repo
+          - native/target
       - type: archive
         archive-type: tar-gzip
         url: https://static.crates.io/crates/ab_glyph/ab_glyph-0.2.32.crate
