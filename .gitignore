@@ -31,10 +31,4 @@ __pycache__/
 
 # Local Vercel project settings
 /.vercel/
-/packaging/appimage/work/
-/packaging/appimage/AppDir/
-/packaging/appimage/bin/
-/packaging/appimage/patchelf*.tar.gz
-packaging/appimage/MacNCheese-*.AppImage
 /native/target/
-MacNCheese-*.AppImage
