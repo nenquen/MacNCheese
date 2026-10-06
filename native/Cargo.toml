@@ -19,6 +19,6 @@ anyhow = "1"
 dirs = "6"
 libc = "0.2"
 ureq = { version = "3", features = ["json"] }
-zip = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
 png = "0.17"
