@@ -33,6 +33,21 @@ modules:
         url: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz
         sha256: aadc97ea91f6ef078b0ae3a62bba69e008d9a7db19b34e4ac973b19b71b4217c
 
+  # OpenGL.framework eagerly loads its libGLU.dylib forwarder, which
+  # dlopens libGLU.so.1 — the GNOME runtime does not ship GLU.
+  - name: libglu
+    buildsystem: simple
+    build-commands:
+      - mkdir -p _glu && bsdtar -xf libglu1-mesa.deb -C _glu 'data.tar.*'
+      - bsdtar -xf _glu/data.tar.* -C _glu
+      - cp -a _glu/usr/lib/x86_64-linux-gnu/libGLU.so.1* /app/lib/
+      - rm -rf _glu
+    sources:
+      - type: file
+        url: https://archive.ubuntu.com/ubuntu/pool/main/libg/libglu/libglu1-mesa_9.0.2-1.1build1_amd64.deb
+        sha256: 4288833eebfbf6b00d1ae98159f429e1f7f6398288c9305edeeb185d9ed048d9
+        dest-filename: libglu1-mesa.deb
+
   - name: darling
     buildsystem: simple
     build-commands:
