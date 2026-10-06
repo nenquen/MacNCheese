@@ -48,6 +48,25 @@ modules:
         sha256: 4288833eebfbf6b00d1ae98159f429e1f7f6398288c9305edeeb185d9ed048d9
         dest-filename: libglu1-mesa.deb
 
+  # AudioToolbox (linked by Roblox) loads its AFAVFormat component and
+  # native/libavformat.dylib forwarders at startup, which dlopen the
+  # ffmpeg 6 sonames. Built inside the SDK against the same libraries
+  # the GNOME runtime ships; the last command fails the build if any
+  # DT_NEEDED stays unresolved.
+  - name: ffmpeg6
+    buildsystem: simple
+    build-commands:
+      - ./configure --prefix=/app --disable-programs --disable-doc --disable-static
+        --enable-shared --disable-x86asm
+      - make -j4
+      - make install
+      - "! ldd /app/lib/libavformat.so.60 /app/lib/libavcodec.so.60 /app/lib/libavutil.so.58
+        /app/lib/libswresample.so.4 | grep 'not found'"
+    sources:
+      - type: archive
+        url: https://ffmpeg.org/releases/ffmpeg-6.1.2.tar.xz
+        sha256: 3b624649725ecdc565c903ca6643d41f33bd49239922e45c9b1442c63dca4e38
+
   - name: darling
     buildsystem: simple
     build-commands:
