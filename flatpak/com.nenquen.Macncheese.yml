@@ -18,6 +18,21 @@ finish-args:
   # Roblox asks the GPU driver for VRAM through sysfs (host_vram_bytes).
   - --filesystem=/sys/class/drm:ro
 modules:
+  # Darling's native forwarders (usr/lib/native/*.dylib) dlopen Linux ELF
+  # libraries by soname. The runtime ships libjpeg.so.62, but
+  # libjpeg.dylib asks for libjpeg.so.8 — the libjpeg-turbo ABI8 build.
+  - name: libjpeg8
+    buildsystem: simple
+    build-commands:
+      - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DWITH_JPEG8=ON -DWITH_SIMD=OFF
+        -DCMAKE_INSTALL_PREFIX=/app -DCMAKE_INSTALL_LIBDIR=lib
+      - cmake --build build --parallel 4
+      - cmake --install build
+    sources:
+      - type: archive
+        url: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz
+        sha256: aadc97ea91f6ef078b0ae3a62bba69e008d9a7db19b34e4ac973b19b71b4217c
+
   - name: darling
     buildsystem: simple
     build-commands:
