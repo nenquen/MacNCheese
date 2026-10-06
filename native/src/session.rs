@@ -89,6 +89,27 @@ pub fn missing_tools() -> Vec<String> {
     missing
 }
 
+/// Append a diagnostics line to logs/session.log — launch mysteries
+/// otherwise end up as screenshot archaeology.
+fn log_line(msg: &str) {
+    let dir = paths::data_dir().join("logs");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("session.log"))
+    {
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(f, "[{t}] {msg}");
+    }
+}
+
 fn source_files() -> Vec<PathBuf> {
     let shim = paths::project().join("shim");
     let mut out = vec![paths::build_script()];
@@ -353,8 +374,23 @@ impl Session {
     ) -> Result<Session, String> {
         let missing = missing_tools();
         if !missing.is_empty() {
-            return Err(format!("missing programs: {}", missing.join(", ")));
+            let msg = format!(
+                "missing programs: {} | shim_built={} prebuilt={:?} pid={}",
+                missing.join(", "),
+                shim_built(),
+                std::env::var("MACNCHEESE_PREBUILT_SHIM"),
+                std::process::id()
+            );
+            log_line(&format!("start refused: {msg}"));
+            return Err(msg);
         }
+        log_line(&format!(
+            "start ok: shim_built={} prebuilt={:?} pid={} client={:?}",
+            shim_built(),
+            std::env::var("MACNCHEESE_PREBUILT_SHIM"),
+            std::process::id(),
+            crate::update::installed_version()
+        ));
         if !shim_built() {
             build_shim()?;
         }
