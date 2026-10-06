@@ -182,12 +182,8 @@ impl App {
         let (update_tx, update_rx) = mpsc::channel();
         let settings = settings::load();
         let needed = Self::setup_needed(&settings);
-        let mut tabs = vec![Tab::Play, Tab::Settings, Tab::Flags, Tab::Logs];
-        if needed {
-            tabs.push(Tab::Setup);
-        }
         let mut app = App {
-            tabs,
+            tabs: vec![Tab::Play, Tab::Settings, Tab::Flags],
             tab: 0,
             settings,
             session: None,
@@ -212,6 +208,8 @@ impl App {
             update_rx,
             clicks: Vec::new(),
         };
+        // Adds Logs (debug) and Setup (missing client), in that order.
+        app.sync_tabs();
         // Open Setup when consent is missing or the client isn't on
         // disk — Sober-style, prompt until Roblox is present.
         if needed {
@@ -231,26 +229,54 @@ impl App {
         !consent || update::installed_version().is_none()
     }
 
-    /// Keep the tab list in sync with the client state (setup finished).
+    /// Keep the tab list in sync with the client state (setup finished)
+    /// and the debug flag (Logs visibility).
     fn sync_tabs(&mut self) {
         let needed = Self::setup_needed(&self.settings);
-        let has = self.tabs.contains(&Tab::Setup);
-        if needed && !has {
+        let want_logs = self
+            .settings
+            .get("debug")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if needed && !self.tabs.contains(&Tab::Setup) {
             self.tabs.push(Tab::Setup);
-        } else if !needed && has {
-            let idx = self.tabs.iter().position(|t| *t == Tab::Setup).unwrap();
-            self.tabs.remove(idx);
-            if self.tab > idx {
-                self.tab -= 1;
+        }
+        if want_logs && !self.tabs.contains(&Tab::Logs) {
+            let at = self
+                .tabs
+                .iter()
+                .position(|t| *t == Tab::Setup)
+                .unwrap_or(self.tabs.len());
+            self.tabs.insert(at, Tab::Logs);
+        }
+        // Drop what is no longer wanted, keeping the selection sane.
+        for gone in [Tab::Logs, Tab::Setup] {
+            let wanted = match gone {
+                Tab::Logs => want_logs,
+                Tab::Setup => needed,
+                _ => true,
+            };
+            if wanted {
+                continue;
             }
-            if self.tab >= self.tabs.len() {
-                self.tab = 0;
+            if let Some(idx) = self.tabs.iter().position(|t| *t == gone) {
+                self.tabs.remove(idx);
+                if self.tab == idx {
+                    self.tab = 0; // was viewing it: back to Play
+                } else if self.tab > idx {
+                    self.tab -= 1;
+                }
+                if self.tab >= self.tabs.len() {
+                    self.tab = 0;
+                }
             }
         }
     }
 
-    fn save_settings(&self) {
+    fn save_settings(&mut self) {
         let _ = settings::save(&self.settings);
+        // Toggling debug must show/hide the Logs tab right away.
+        self.sync_tabs();
     }
 
     // -- play ------------------------------------------------------
@@ -963,7 +989,7 @@ pub(crate) fn ui(f: &mut ratatui::Frame, app: &mut App) {
             }
         })
         .collect();
-    let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+    let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("cheese");
     let pal = crate::theme::resolve(mode);
     let tabs = Tabs::new(titles.clone())
         .divider(Span::raw(" | "))
@@ -1384,11 +1410,17 @@ pub(crate) fn setting_sections() -> Vec<Section> {
                 Row::Cycle {
                     key: "theme",
                     title: "Color theme",
-                    help: "Launcher palette, dark only \u{2014} System keeps the default dark look. Drop files in ~/.config/macncheese/themes for custom ones.",
+                    help: "Launcher palette. Cheese (the default) is matched to the logo; drop files in ~/.config/macncheese/themes for your own.",
                     options: crate::theme::names()
                         .into_iter()
                         .map(|(a, b)| (a.to_string(), b.to_string()))
                         .collect(),
+                },
+                Row::Bool {
+                    key: "debug",
+                    title: "Debug logging",
+                    help: "Show the Logs tab with the Roblox output and launch diagnostics. While off, the tab is hidden entirely.",
+                    default: false,
                 },
             ],
         },
@@ -1438,19 +1470,6 @@ pub(crate) enum Row {
     },
 }
 
-/// Filled/empty cells showing where the value sits between min and max.
-fn range_bar(v: f64, min: f64, max: f64, width: usize) -> (usize, String, String) {
-    let span = (max - min).max(f64::EPSILON);
-    let filled = (((v - min) / span) * width as f64)
-        .round()
-        .clamp(0.0, width as f64) as usize;
-    (
-        filled,
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(width - filled),
-    )
-}
-
 impl Row {
     fn key(&self) -> &'static str {
         match self {
@@ -1483,10 +1502,9 @@ impl Row {
                     .unwrap_or_else(|| cur.to_string());
                 format!("\u{2039} {label} \u{203a}")
             }
-            Row::Number { key, min, max, pct, .. } => {
+            Row::Number { key, min, pct, .. } => {
                 let v = settings.get(*key).and_then(|v| v.as_f64()).unwrap_or(*min);
-                let (_, on, off) = range_bar(v, *min, *max, 10);
-                format!("{} {on}{off}", Row::display(v, *pct))
+                Row::display(v, *pct)
             }
             Row::Bool { key, default, .. } => {
                 let on = settings.get(*key).and_then(|v| v.as_bool()).unwrap_or(*default);
@@ -1507,25 +1525,19 @@ impl Row {
         }
     }
 
-    /// The value column split into styled parts: label in the accent color,
-    /// the bar's empty half dimmed so the fill reads at a glance.
+    /// The value column in the accent color (or ok/dim for toggles).
     pub(crate) fn value_spans(
         &self,
         settings: &Map<String, Value>,
         pal: &crate::theme::Palette,
     ) -> Vec<Span<'static>> {
         match self {
-            Row::Number { key, min, max, pct, .. } => {
+            Row::Number { key, min, pct, .. } => {
                 let v = settings.get(*key).and_then(|v| v.as_f64()).unwrap_or(*min);
-                let (_, on, off) = range_bar(v, *min, *max, 10);
-                vec![
-                    Span::styled(
-                        format!("{} ", Row::display(v, *pct)),
-                        Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(on, Style::default().fg(pal.accent)),
-                    Span::styled(off, Style::default().fg(pal.dim)),
-                ]
+                vec![Span::styled(
+                    Row::display(v, *pct),
+                    Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
+                )]
             }
             Row::Bool { key, default, .. } => {
                 let on = settings.get(*key).and_then(|v| v.as_bool()).unwrap_or(*default);
@@ -1671,7 +1683,7 @@ mod tui_tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|f| ui(f, &mut app)).unwrap();
         let buf = terminal.backend().buffer();
-        let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+        let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("cheese");
         let pal = crate::theme::resolve(mode);
         // Block starts at y=3: header at y=4, selected first row at y=5.
         let selected = &buf[(2, 5)];
@@ -1696,6 +1708,26 @@ mod tui_tests {
         app.settings_cursor = setting_rows().len() - 1;
         app.jump_section(1);
         assert_eq!(app.settings_cursor, setting_rows().len() - 1, "PgDn at end stays");
+    }
+
+    #[test]
+    fn debug_flag_gates_the_logs_tab() {
+        let mut app = App::new();
+        app.settings.insert("debug".into(), Value::Bool(false));
+        app.sync_tabs();
+        assert!(!app.tabs.contains(&Tab::Logs), "Logs must stay hidden");
+        app.settings.insert("debug".into(), Value::Bool(true));
+        app.sync_tabs();
+        assert!(app.tabs.contains(&Tab::Logs), "debug must reveal Logs");
+        // Viewing Logs and switching debug off lands back on Play.
+        app.tab = app.tabs.iter().position(|t| *t == Tab::Logs).unwrap();
+        app.settings.insert("debug".into(), Value::Bool(false));
+        app.sync_tabs();
+        assert!(!app.tabs.contains(&Tab::Logs), "Logs must disappear again");
+        assert!(
+            app.tabs.get(app.tab).copied() == Some(Tab::Play),
+            "selection falls back to Play"
+        );
     }
 
     #[test]

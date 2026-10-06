@@ -182,7 +182,7 @@ impl ApplicationHandler for Gui {
             .and_then(|v| v.as_f64())
             .unwrap_or(1.0)
             .clamp(0.8, 2.0);
-        let mode = stored.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+        let mode = stored.get("theme").and_then(|v| v.as_str()).unwrap_or("cheese");
         let pal = crate::theme::resolve(mode);
         let backend = futures_lite::future::block_on(
             Builder::from_font(font)

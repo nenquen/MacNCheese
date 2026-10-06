@@ -89,8 +89,23 @@ pub static GRUVBOX: Palette = Palette {
     border: Color::Rgb(102, 92, 84),
 };
 
+/// The house theme: sampled from the cheese logo (#fbc558 light cheese,
+/// #ead9b2 cream, #c36914 baked edge) on a dark toast ground, with the
+/// gruvbox-ish supporting colors so everything stays in the same family.
+pub static CHEESE: Palette = Palette {
+    bg: Color::Rgb(30, 26, 19),      // #1e1a13 dark toast
+    fg: Color::Rgb(234, 217, 178),   // #ead9b2 cream (logo highlight)
+    accent: Color::Rgb(251, 197, 88), // #fbc558 light cheese (logo)
+    dim: Color::Rgb(143, 127, 90),   // #8f7f5a muted gold-brown
+    ok: Color::Rgb(169, 182, 101),   // #a9b665 olive green (gruvbox-ish)
+    warn: Color::Rgb(231, 138, 78),  // #e78a4e warm orange (baked edge)
+    err: Color::Rgb(234, 105, 98),   // #ea6962 gruvbox red
+    border: Color::Rgb(90, 77, 56),  // #5a4d38 baked crust
+};
+
 pub fn builtin(name: &str) -> Option<&'static Palette> {
     Some(match name {
+        "cheese" | "macncheese" => &CHEESE,
         "dark" => &DARK,
         "catppuccin" | "catppuccin-mocha" => &CATPPUCCIN,
         "rose-pine" | "rosepine" | "rose" => &ROSE_PINE,
@@ -103,7 +118,7 @@ pub fn builtin(name: &str) -> Option<&'static Palette> {
 
 pub fn names() -> Vec<(&'static str, &'static str)> {
     vec![
-        ("system", "System"),
+        ("cheese", "Cheese"),
         ("catppuccin", "Catppuccin"),
         ("rose-pine", "Rosé Pine"),
         ("tokyonight", "TokyoNight"),
@@ -149,14 +164,15 @@ pub fn custom(name: &str) -> Option<Palette> {
 }
 
 pub fn resolve(mode: &str) -> Palette {
+    // No system/light following: the default is the house Cheese theme,
+    // and "system" (removed) migrates to it in settings::load().
     if mode == "system" || mode.is_empty() {
-        // Dark only, by design: even a light desktop gets a dark theme.
-        return DARK.clone();
+        return CHEESE.clone();
     }
     if let Some(custom) = custom(mode) {
         return custom;
     }
-    builtin(mode).cloned().unwrap_or_else(|| DARK.clone())
+    builtin(mode).cloned().unwrap_or_else(|| CHEESE.clone())
 }
 
 #[cfg(test)]
@@ -165,16 +181,21 @@ mod tests {
 
     #[test]
     fn known_themes() {
-        for name in ["catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
+        for name in ["cheese", "catppuccin", "rose-pine", "tokyonight", "nord", "gruvbox"] {
             assert!(builtin(name).is_some(), "{name}");
         }
         assert!(builtin("light").is_none(), "no light themes");
+        assert!(builtin("system").is_none(), "system theme removed");
+        assert!(names().iter().all(|(v, _)| *v != "system"), "no system option");
+        assert_eq!(names()[0].0, "cheese", "Cheese is the main theme");
     }
 
     #[test]
     fn unknown_falls_back() {
         let pal = resolve("nope");
-        assert!(matches!(pal.bg, Color::Black));
+        assert_eq!(pal.bg, CHEESE.bg, "unknown themes fall back to Cheese");
+        assert_eq!(resolve("").bg, CHEESE.bg, "empty mode is Cheese too");
+        assert_eq!(resolve("system").bg, CHEESE.bg, "stored system -> Cheese");
     }
 
     #[test]
