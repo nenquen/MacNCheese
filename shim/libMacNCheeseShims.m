@@ -2152,11 +2152,15 @@ static void hooked_app_finish_launching(id self, SEL cmd) {
 // whole teardown (network closes, telemetry) to finish.
 static void macncheese_write_quit_sentinel(void) {
     const char* path = getenv("MACNCHEESE_QUIT_SENTINEL");
-    if (!path || !path[0])
+    if (!path || !path[0]) {
+        write_str("[MacNCheese] Quit sentinel: MACNCHEESE_QUIT_SENTINEL not set\n");
         return;
+    }
     MacNCheeseFILE* file = fopen(path, "w");
-    if (!file)
+    if (!file) {
+        write_str("[MacNCheese] Quit sentinel: cannot write file\n");
         return;
+    }
     fclose(file);
     write_str("[MacNCheese] Quit sentinel written\n");
 }

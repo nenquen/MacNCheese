@@ -357,6 +357,13 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Resu
             icon.display()
         ));
     }
+    // The shim writes this from inside Darling when the game window is
+    // closed; poll() ends the session right away instead of waiting for
+    // Roblox's full teardown. (Lost when the Python launcher went away.)
+    vars.push(format!(
+        "MACNCHEESE_QUIT_SENTINEL=/Volumes/SystemRoot{}",
+        crate::paths::quit_sentinel().display()
+    ));
     if bool_of("hide_menu_bar", true) {
         vars.push("MACNCHEESE_HIDE_MENU_BAR=1".into());
     }
