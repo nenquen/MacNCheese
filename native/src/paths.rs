@@ -110,6 +110,13 @@ pub fn build_script() -> PathBuf {
 }
 
 pub fn frameworks_build() -> PathBuf {
+    // Flatpak builds the stub frameworks once at image build time next
+    // to the prebuilt shim; the per-user build dir is not involved.
+    if let Ok(pre) = std::env::var("MACNCHEESE_PREBUILT_SHIM") {
+        if !pre.is_empty() {
+            return PathBuf::from(pre).join("frameworks");
+        }
+    }
     build_dir().join("frameworks")
 }
 

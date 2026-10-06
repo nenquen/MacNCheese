@@ -70,14 +70,23 @@ fn have(cmd: &str) -> bool {
 
 /// Programs the launch needs that are missing.
 pub fn missing_tools() -> Vec<String> {
-    ["darling", "clang", "ld.lld", "unzip", "pw-cat"]
+    let mut missing = ["darling", "unzip", "pw-cat"]
         .into_iter()
         .filter(|t| !have(t))
+        .filter(|t| *t != "pw-cat" || !have("pacat"))
         .map(str::to_string)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .filter(|t| t != "pw-cat" || !have("pacat"))
-        .collect()
+        .collect::<Vec<_>>();
+    // clang/lld are only needed to compile the shim; Flatpak ships a
+    // prebuilt one (MACNCHEESE_PREBUILT_SHIM), so don't demand a
+    // toolchain when there is nothing to build.
+    if !shim_built() {
+        for tool in ["clang", "ld.lld"] {
+            if !have(tool) {
+                missing.push(tool.into());
+            }
+        }
+    }
+    missing
 }
 
 fn source_files() -> Vec<PathBuf> {
@@ -112,6 +121,12 @@ pub fn shim_built() -> bool {
         {
             return false;
         }
+    }
+    // A prebuilt payload (Flatpak, MACNCHEESE_PREBUILT_SHIM) is
+    // immutable: updates arrive with the app image, so source mtimes
+    // carry no signal — existence above is all we can check.
+    if std::env::var("MACNCHEESE_PREBUILT_SHIM").is_ok_and(|v| !v.is_empty()) {
+        return true;
     }
     let built = match std::fs::metadata(&dylib).and_then(|m| m.modified()) {
         Ok(t) => t,
