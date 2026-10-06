@@ -4,6 +4,7 @@ runtime-version: '50'
 sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.llvm22
+  - org.freedesktop.Sdk.Extension.rust-stable
 command: macncheese
 finish-args:
   - --share=network
@@ -32,7 +33,7 @@ modules:
   - name: macncheese
     buildsystem: simple
     build-options:
-      append-path: /usr/lib/sdk/llvm22/bin
+      append-path: /usr/lib/sdk/llvm22/bin:/usr/lib/sdk/rust-stable/bin
       prepend-ld-library-path: /usr/lib/sdk/llvm22/lib
     build-commands:
       # The shim and the stub frameworks, against Darling's macOS root.
