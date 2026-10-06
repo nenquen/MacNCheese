@@ -1582,27 +1582,56 @@ static void crash_handler(int sig, void* info, void* uap) {
             print_addr_info("  RDI info: ", (void*)mc[6]);
             print_addr_info("  RSI info: ", (void*)mc[7]);
 
-            // Raw stack words that look like user-space addresses, innermost
-            // and outermost: a trail through code without frame pointers
-            // (the host's GPU driver), where the walk below finds nothing.
-            write_str("\n[MacNCheese Stack Words near RSP]:\n");
-            // A stack overflow leaves RSP in the guard page: start above it.
-            unsigned long long* sp = (unsigned long long*)((mc[9] + 0x1000) & ~0xfffULL);
-            int shown = 0;
-            for (int i = 0; i < 4096; i++) {
-                unsigned long long word = sp[i];
-                if (word < 0x7f0000000000ULL || word >= 0x800000000000ULL) continue;
-                print_hex(word);
-                write_str(++shown % 6 ? " " : "\n");
-            }
+            // The symbolized walk first: it is the part a reader acts on,
+            // so nothing further down can push it out of the log. Code
+            // without frame pointers leaves other values in RBP: only
+            // follow ones inside this stack, going up.
             extern void* pthread_get_stackaddr_np(void*);
             extern void* pthread_self(void);
             unsigned long long* top = (unsigned long long*)pthread_get_stackaddr_np(pthread_self());
+            unsigned long long rsp = mc[9];
+            write_str("\n[MacNCheese Stack Walk from RBP]:\n");
+            void** fp = (void**)mc[8];
+            unsigned long long low = rsp;
+            unsigned long long high = (top && (unsigned long long)top > rsp)
+                ? (unsigned long long)top : rsp + (1ULL << 20);
+            for (int i = 0; i < 30 && fp; i++) {
+                // Two words (fp[0], fp[1]) must be inside this stack too.
+                if ((unsigned long long)fp + 16 > high ||
+                    (unsigned long long)fp < low || ((unsigned long long)fp & 7))
+                    break;
+                void* ret_addr = fp[1];
+                write_str("  #"); print_num(i); write_str(" ");
+                print_addr_info("", ret_addr);
+                low = (unsigned long long)fp + 16;
+                fp = (void**)fp[0];
+            }
+
+            // Raw stack words that look like user-space addresses, innermost
+            // and outermost: a trail through code without frame pointers
+            // (the host's GPU driver), where the walk finds nothing. Every
+            // scan stays inside [rsp, stack top): a read past the top would
+            // fault inside the handler and lose the rest of the dump.
+            write_str("\n[MacNCheese Stack Words near RSP]:\n");
+            // A stack overflow leaves RSP in the guard page: start above it.
+            unsigned long long* sp = (unsigned long long*)((rsp + 0x1000) & ~0xfffULL);
+            int shown = 0;
+            if (top && (unsigned long long)top > (unsigned long long)sp) {
+                unsigned long long* bound = (unsigned long long*)top;
+                if (bound > sp + 4096)
+                    bound = sp + 4096;
+                for (unsigned long long* word_at = sp; word_at < bound; word_at++) {
+                    unsigned long long word = *word_at;
+                    if (word < 0x7f0000000000ULL || word >= 0x800000000000ULL) continue;
+                    print_hex(word);
+                    write_str(++shown % 6 ? " " : "\n");
+                }
+            }
             write_str("\n[MacNCheese Stack Words near the stack top ");
             print_hex((unsigned long long)top);
             write_str("]:\n");
             shown = 0;
-            if (top && (unsigned long long)top > mc[9] && (unsigned long long)top - mc[9] > 16384) {
+            if (top && (unsigned long long)top > rsp && (unsigned long long)top - rsp > 16384) {
                 for (int i = 2048; i > 0; i--) {
                     unsigned long long word = top[-i];
                     if (word < 0x7f0000000000ULL || word >= 0x800000000000ULL) continue;
@@ -1611,21 +1640,6 @@ static void crash_handler(int sig, void* info, void* uap) {
                 }
             }
             write_str("\n");
-            write_str("\n[MacNCheese Stack Walk from RBP]:\n");
-            void** fp = (void**)mc[8];
-            unsigned long long low = mc[9];
-            unsigned long long high = (unsigned long long)top > mc[9] ? (unsigned long long)top : mc[9] + (1ULL << 20);
-            for (int i = 0; i < 30 && fp; i++) {
-                // Code without frame pointers leaves other values in RBP:
-                // only follow ones inside this stack, going up.
-                if ((unsigned long long)fp < low || (unsigned long long)fp >= high ||
-                    ((unsigned long long)fp & 7)) break;
-                void* ret_addr = fp[1];
-                write_str("  #"); print_num(i); write_str(" ");
-                print_addr_info("", ret_addr);
-                low = (unsigned long long)fp + 16;
-                fp = (void**)fp[0];
-            }
         }
     }
     write_str("[MacNCheese FATAL CRASH] ****************************************\n\n");
@@ -2959,6 +2973,9 @@ extern long read(int, void*, unsigned long);
 extern int macncheese_cursor_overlay_update(int, unsigned long, int);
 static volatile int macncheese_cursor_wanted_hidden;
 static volatile unsigned long macncheese_cursor_lock_window;
+/* Forward declaration: the single definition lives with the raw mouse
+ * state below (tentative definitions merge). */
+static unsigned int macncheese_raw_buttons; // X buttons held, bit 1..3
 static volatile int macncheese_cursor_hide_depth;
 static volatile int macncheese_cursor_worker_ready;
 static volatile int macncheese_cursor_worker_started;
@@ -3016,8 +3033,34 @@ static void* macncheese_xfixes_worker(void* unused) {
             }
         }
         unsigned long lock_window = __atomic_load_n(&macncheese_cursor_lock_window, __ATOMIC_ACQUIRE);
-        if (!macncheese_cursor_overlay_update(wanted, lock_window,
-                __atomic_load_n(&macncheese_cursor_hide_depth, __ATOMIC_ACQUIRE) == 0)) {
+        /* Right-drag rotates the camera with the cursor visible: only a
+         * button-free lock (first-person) hides it. The game hides its own
+         * cursor for both, so the overlay must not follow hide depth while
+         * the right button is held. */
+        int hide_depth = __atomic_load_n(&macncheese_cursor_hide_depth, __ATOMIC_ACQUIRE);
+        unsigned int buttons = __atomic_load_n(&macncheese_raw_buttons, __ATOMIC_ACQUIRE);
+        int show = hide_depth == 0 || (buttons & (1u << 3));
+        {
+            /* Lock/visibility transitions, first few only: right-drag
+             * cursor reports otherwise need a guessing game. */
+            static int logged_state = -1;
+            static volatile long logged_lines;
+            int state = (wanted ? 4 : 0) | (show ? 2 : 0) | (hide_depth ? 1 : 0);
+            if (state != logged_state) {
+                logged_state = state;
+                if (__sync_add_and_fetch(&logged_lines, 1) <= 8) {
+                    write_str("[MacNCheese Cursor] lock=");
+                    print_num(wanted);
+                    write_str(show ? " visible" : " hidden");
+                    write_str(" hide_depth=");
+                    print_num(hide_depth);
+                    write_str(" buttons=");
+                    print_hex(buttons & 0xf);
+                    write_str("\n");
+                }
+            }
+        }
+        if (!macncheese_cursor_overlay_update(wanted, lock_window, show)) {
             static int reported;
             if (!reported) {
                 reported = 1;

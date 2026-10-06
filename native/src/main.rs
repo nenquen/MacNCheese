@@ -1355,6 +1355,12 @@ pub(crate) fn setting_sections() -> Vec<Section> {
                     help: "How Roblox windows are created. X11 works everywhere; native Wayland is experimental with mouse-lock quirks.",
                     options: vec![("x11".into(), "X11 / Xwayland".into()), ("wayland".into(), "Native Wayland (experimental)".into())],
                 },
+                Row::Cycle {
+                    key: "framerate_cap",
+                    title: "Frame rate cap",
+                    help: "Roblox caps itself at 60 FPS even with vsync off; Unlimited lifts it via the scheduler flag. Applies on next launch.",
+                    options: vec![("0".into(), "Unlimited".into()), ("60".into(), "60 FPS".into()), ("120".into(), "120 FPS".into()), ("144".into(), "144 FPS".into()), ("240".into(), "240 FPS".into())],
+                },
                 Row::Number {
                     key: "dpi_scale",
                     title: "Roblox UI scale",

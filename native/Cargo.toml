@@ -1,3 +1,9 @@
+[workspace]
+members = ["web"]
+# Plain `cargo build`/`test` cover the launcher and the browser helper.
+default-members = [".", "web"]
+resolver = "2"
+
 [package]
 name = "macncheese"
 version = "0.21.0"

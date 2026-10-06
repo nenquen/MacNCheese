@@ -271,6 +271,15 @@ impl ApplicationHandler for Gui {
             self.redraw();
         }
     }
+
+    /// The loop is still alive here, unlike a field drop after run_app
+    /// returns: the surface must be let go (renderer, then window) while
+    /// the Wayland/X11 connection it talks to still exists — dropping
+    /// wgpu against a torn-down connection segfaults.
+    fn exiting(&mut self, _el: &ActiveEventLoop) {
+        self.backend = None;
+        self.window = None;
+    }
 }
 
 pub fn run() -> anyhow::Result<()> {

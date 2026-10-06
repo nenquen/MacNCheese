@@ -552,6 +552,13 @@ static ssize_t traced_recv(int fd, void *buffer, size_t size, int flags) {
 }
 DYLD_INTERPOSE(traced_recv, recv)
 
+/* NOTE (2026-10-06): slicing long poll waits into 50 ms pieces with
+ * level-triggered UDP synthesis (like traced_kevent) regressed game
+ * startup — the critical-settings download hung pre-AppDelegate. The
+ * mechanism is unclear (both added syscalls are non-blocking by
+ * construction), so this stays a plain forward until the hang is
+ * understood. The UDP stall watchdog + kicks below still keep stalled
+ * readers alive. */
 static int traced_poll(void *fds, unsigned int count, int timeout) {
     if (trace_enabled())
         __sync_add_and_fetch(&poll_calls, 1);

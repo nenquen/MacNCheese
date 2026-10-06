@@ -1,0 +1,16 @@
+[package]
+name = "macncheese-web"
+version = "0.21.0"
+edition = "2021"
+
+[[bin]]
+name = "macncheese-web"
+path = "src/main.rs"
+
+[dependencies]
+# webkit6 needs gtk::Accessible, which gtk4 keeps behind v4_10 (and does
+# not enable by itself). The runtime ships GTK 4.22 either way.
+gtk4 = { version = "0.11", features = ["v4_10"] }
+# v2_42 for CookieManager::all_cookies (the game's cookies-get op).
+webkit6 = { version = "0.6", features = ["v2_42"] }
+serde_json = "1"

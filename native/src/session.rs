@@ -8,12 +8,15 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::audio::Audio;
 use crate::paths;
 
 const STUB_FRAMEWORKS: &[&str] = &["CoreML", "CoreHaptics", "DeviceCheck"];
+
+/// The host filesystem as the game (inside Darling) sees it.
+const GUEST_PREFIX: &str = "/Volumes/SystemRoot";
 
 const TRACE_ENV: &[(&str, &str)] = &[
     ("diagnostic_signals", "MACNCHEESE_DIAGNOSTIC_SIGNALS"),
@@ -90,8 +93,12 @@ pub fn missing_tools() -> Vec<String> {
 }
 
 /// Append a diagnostics line to logs/session.log — launch mysteries
-/// otherwise end up as screenshot archaeology.
+/// otherwise end up as screenshot archaeology. Debug off: no record is
+/// kept at all, the switch covers every log the launcher writes.
 pub(crate) fn log_line(msg: &str) {
+    if !crate::settings::debug_enabled() {
+        return;
+    }
     let dir = paths::data_dir().join("logs");
     if std::fs::create_dir_all(&dir).is_err() {
         return;
@@ -370,7 +377,11 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Resu
     if !bool_of("raw_mouse", true) {
         vars.push("MACNCHEESE_RAW_MOUSE=0".into());
     }
-    let cap = get("framerate_cap").and_then(|v| v.as_u64()).unwrap_or(0);
+    // The Cycle row stores strings ("0" = Unlimited); older files may
+    // hold a number.
+    let cap = get("framerate_cap")
+        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+        .unwrap_or(0);
     if cap > 0 {
         vars.push(format!("MACNCHEESE_FRAMERATE_CAP={cap}"));
     }
@@ -383,10 +394,143 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Resu
     Ok((vars, wayland))
 }
 
+/// macncheese-web: the WebKitGTK window for Roblox's embedded pages
+/// (sign-in and its captcha, purchases). It binds a Unix socket, this
+/// side waits for it and hands the path — as the game sees it under
+/// Darling — plus WebKit's default user agent over as environment.
+struct WebBridge {
+    child: Child,
+    socket: PathBuf,
+    user_agent_file: PathBuf,
+    guest_path: String,
+    user_agent: String,
+}
+
+/// Installed next to the launcher (/app/lib/macncheese, target/release).
+fn web_helper() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let helper = exe.with_file_name("macncheese-web");
+    helper.is_file().then_some(helper)
+}
+
+fn start_web_bridge(log: Option<&std::fs::File>) -> Option<WebBridge> {
+    let helper = match web_helper() {
+        Some(helper) => helper,
+        None => {
+            log_line("web bridge: no macncheese-web next to the launcher");
+            return None;
+        }
+    };
+    // macOS sockaddr_un holds 104 bytes, prefix included — the same
+    // fitting test the Python bridge made (web.py).
+    let name = format!("macncheese-web-{}.sock", std::process::id());
+    let mut candidates: Vec<PathBuf> = std::env::var("XDG_RUNTIME_DIR")
+        .ok()
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .into_iter()
+        .chain([PathBuf::from("/tmp")])
+        .collect();
+    candidates.retain(|dir| {
+        format!("{GUEST_PREFIX}{}", dir.join(&name).display()).len() < 104
+    });
+    let Some(dir) = candidates.first() else {
+        log_line("web bridge: socket path too long");
+        return None;
+    };
+    let socket = dir.join(&name);
+    let user_agent_file = PathBuf::from(format!("{}.ua", socket.display()));
+    // A socket a killed helper left behind would satisfy the wait below
+    // before this one has bound anything.
+    let _ = std::fs::remove_file(&socket);
+    let _ = std::fs::remove_file(&user_agent_file);
+    let mut command = Command::new(&helper);
+    command
+        .arg(&socket)
+        .arg(web_data_dir())
+        .arg(paths::cache_dir().join("web"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null());
+    match log {
+        // Debug on: WebKit's warnings belong in the launch log.
+        Some(file) => match file.try_clone() {
+            Ok(stderr) => {
+                command.stderr(Stdio::from(stderr));
+            }
+            Err(_) => {
+                command.stderr(Stdio::null());
+            }
+        },
+        // Debug off: the launcher keeps no record at all.
+        None => {
+            command.stderr(Stdio::null());
+        }
+    }
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            log_line(&format!("web bridge: cannot start the helper: {error}"));
+            return None;
+        }
+    };
+    // The helper writes the user agent first and binds second, so a
+    // bound socket implies the file exists.
+    let mut ready = false;
+    for _ in 0..200 {
+        if socket.exists() {
+            ready = true;
+            break;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                log_line(&format!("web bridge: helper exited early: {status}"));
+                let _ = std::fs::remove_file(&user_agent_file);
+                return None;
+            }
+            _ => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
+    if !ready {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_file(&socket);
+        let _ = std::fs::remove_file(&user_agent_file);
+        log_line("web bridge: helper never bound its socket");
+        return None;
+    }
+    let user_agent = std::fs::read_to_string(&user_agent_file)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let guest_path = format!("{GUEST_PREFIX}{}", socket.display());
+    log_line(&format!(
+        "web bridge: ready socket={guest_path} ua_len={}",
+        user_agent.len()
+    ));
+    Some(WebBridge {
+        child,
+        socket,
+        user_agent_file,
+        guest_path,
+        user_agent,
+    })
+}
+
+/// Cookies and site data live where the Python launcher kept them:
+/// ~/.config/macncheese/web (WEB_DATA_DIR).
+fn web_data_dir() -> PathBuf {
+    std::env::var("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().join(".config"))
+        .join("macncheese")
+        .join("web")
+}
+
 pub struct Session {
     pub log_path: Option<PathBuf>,
     process: Option<Child>,
     audio: Option<Audio>,
+    web: Option<WebBridge>,
     seen_roblox: bool,
 }
 
@@ -421,6 +565,13 @@ impl Session {
         prepare_prefix()?;
         let prefix_took = t0.elapsed().as_secs_f32();
         crate::flags::ensure_raknet();
+        crate::flags::ensure_fps_cap(
+            settings
+                .get("framerate_cap")
+                .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+                .unwrap_or(0),
+        );
+        crate::flags::sync_to_client();
         crate::update::ensure_launch_patches();
         crate::mods::apply(settings);
 
@@ -456,20 +607,32 @@ impl Session {
         let _ = std::fs::create_dir_all(paths::cache_dir().join("mesa-shader-cache"));
         let _ = std::fs::create_dir_all(paths::cache_dir().join("nvidia-shader-cache"));
         let _ = std::fs::create_dir_all(paths::cache_dir().join("roblox-tmp"));
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        let log_path = logs.join(format!("launch-n{stamp}.log"));
-        let mut log = std::fs::File::create(&log_path)
-            .map_err(|e| format!("cannot open log: {e}"))?;
-        writeln!(log, "Mac'n Cheese {}", env!("CARGO_PKG_VERSION")).ok();
-        writeln!(
-            log,
-            "Prefix preparation took {prefix_took:.1} s; Darling warmup took {warmup_took:.1} s"
-        )
-        .ok();
-        log.flush().ok();
+        // Debug off: no launch log exists and the child's output goes to
+        // the void; the Play tab tail reads log_path and shows nothing.
+        let debug = settings
+            .get("debug")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let mut log_path: Option<PathBuf> = None;
+        let mut log: Option<std::fs::File> = None;
+        if debug {
+            let stamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let path = logs.join(format!("launch-n{stamp}.log"));
+            let mut file = std::fs::File::create(&path)
+                .map_err(|e| format!("cannot open log: {e}"))?;
+            writeln!(file, "Mac'n Cheese {}", env!("CARGO_PKG_VERSION")).ok();
+            writeln!(
+                file,
+                "Prefix preparation took {prefix_took:.1} s; Darling warmup took {warmup_took:.1} s"
+            )
+            .ok();
+            file.flush().ok();
+            log_path = Some(path);
+            log = Some(file);
+        }
 
         let data = paths::data_dir();
         let shim_parent = paths::shim()
@@ -488,38 +651,58 @@ impl Session {
             launch_uri.unwrap_or_default(),
         ];
         command.extend(vars);
-        let log_file = std::fs::File::create(&log_path).map_err(|e| format!("log: {e}"))?;
-        let stderr = log_file.try_clone().map_err(|e| format!("log: {e}"))?;
-        let child = Command::new("darling")
+        // One file, cloned (dup): the header stays at the top of the
+        // log — a second File::create used to truncate it first. No
+        // debug, no file: the child's output goes to the void.
+        let (stdout, stderr) = match &log {
+            Some(file) => (
+                Stdio::from(file.try_clone().map_err(|e| format!("log: {e}"))?),
+                Stdio::from(file.try_clone().map_err(|e| format!("log: {e}"))?),
+            ),
+            None => (Stdio::null(), Stdio::null()),
+        };
+        // The embedded-pages browser must be answering before the game
+        // starts: the shim's WKWebView hook only engages once it sees the
+        // socket path. Missing helper (or a failed start) simply means no
+        // socket — embedded pages fail cleanly instead of hitting
+        // Darling's stub WKWebView.
+        let web = start_web_bridge(log.as_ref());
+        if let Some(web) = &web {
+            command.push(format!("MACNCHEESE_WEB_SOCKET={}", web.guest_path));
+            if !web.user_agent.is_empty() {
+                command.push(format!("MACNCHEESE_WEB_USER_AGENT={}", web.user_agent));
+            }
+        }
+        // Sweep a crash handler left over from an earlier session; the
+        // handler of THIS session starts below and stays alive (finish()
+        // retires it a few seconds after the game ends), so a crash
+        // during this session still lands a minidump.
+        let _ = Command::new("pkill")
+            .args(["-f", "RobloxCrashHandler"])
+            .status();
+        let child = match Command::new("darling")
             .args(&command[1..])
             .envs(base_env(wayland))
             .stdin(Stdio::null())
-            .stdout(log_file)
+            .stdout(stdout)
             .stderr(stderr)
             .spawn()
-            .map_err(|e| format!("could not start darling: {e}"))?;
-
-        // Crash-handler suppression thread (slow dumps block exit).
-        std::thread::spawn(|| {
-            for _ in 0..10 {
-                std::thread::sleep(std::time::Duration::from_secs(2));
-                let out = Command::new("pgrep")
-                    .args(["-f", "RobloxCrashHandler"])
-                    .output();
-                let hit = out.map(|o| !o.stdout.is_empty()).unwrap_or(false);
-                if hit {
-                    let _ = Command::new("pkill")
-                        .args(["-f", "RobloxCrashHandler"])
-                        .status();
-                    break;
+        {
+            Ok(child) => child,
+            Err(error) => {
+                if let Some(mut web) = web {
+                    let _ = web.child.kill();
+                    let _ = web.child.wait();
                 }
+                return Err(format!("could not start darling: {error}"));
             }
-        });
+        };
 
         Ok(Session {
-            log_path: Some(log_path),
+            log_path,
             process: Some(child),
             audio,
+            web,
             seen_roblox: false,
         })
     }
@@ -578,6 +761,46 @@ impl Session {
         }
         if let Some(audio) = self.audio.take() {
             audio.stop();
+        }
+        // The browser dies with the session; its socket and user agent
+        // file go too — a stale socket could satisfy the next session's
+        // readiness wait before its own helper has bound anything.
+        if let Some(mut web) = self.web.take() {
+            let _ = web.child.kill();
+            let socket = web.socket.clone();
+            let user_agent_file = web.user_agent_file.clone();
+            match web.child.try_wait() {
+                Ok(Some(_)) => {}
+                _ => {
+                    std::thread::spawn(move || {
+                        let _ = web.child.wait();
+                    });
+                }
+            }
+            let _ = std::fs::remove_file(socket);
+            let _ = std::fs::remove_file(user_agent_file);
+        }
+        // The crash handler may be writing a dump right now — keeping it
+        // alive during the session is the whole point — so hand it a few
+        // seconds, then retire exactly the pids seen here. The detached
+        // shell outlives this process (a slow dump must not keep the
+        // sandbox open after the launcher is gone), and killing the
+        // captured pids can never hit a handler of a later session.
+        if let Ok(out) = Command::new("pgrep")
+            .args(["-f", "RobloxCrashHandler"])
+            .output()
+        {
+            let seen = String::from_utf8_lossy(&out.stdout);
+            let pids: Vec<&str> = seen.split_whitespace().collect();
+            if !pids.is_empty() {
+                let _ = Command::new("sh")
+                    .arg("-c")
+                    .arg(format!("sleep 6; kill {} 2>/dev/null", pids.join(" ")))
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn();
+            }
         }
     }
 }

@@ -30,6 +30,7 @@ fn defaults() -> HashMap<&'static str, Value> {
     m.insert("show_launcher_after_exit", Value::Bool(true));
     m.insert("diagnostic_signals", Value::Bool(false));
     m.insert("keep_logs", Value::from(30));
+    m.insert("framerate_cap", Value::from("0"));
     m
 }
 
@@ -46,6 +47,15 @@ fn settings_file() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().join(".config"));
     base.join("macncheese").join("settings.json")
+}
+
+/// Is debug logging on? Read fresh from disk: log_line and the wrapper
+/// shell both gate on it, and neither has the in-memory map.
+pub fn debug_enabled() -> bool {
+    load()
+        .get("debug")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
 }
 
 /// Merge stored settings over defaults; wrong types fall back silently.

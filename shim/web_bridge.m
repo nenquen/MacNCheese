@@ -265,23 +265,32 @@ static void closeHostedView(id self, SEL selector) {
     removeHostedView(self, selector);
 }
 
+// WKWebView alloc becomes the stand-in above — idempotent, and needed
+// whether or not the launcher listens: without it Roblox keeps Darling's
+// stub WKWebView, whose init returns garbage, and dies on the first
+// delegate call.
+static void installWebViewHook(void) {
+    Class webView = objc_getClass("WKWebView");
+    if (webView)
+        class_addMethod(object_getClass((id)webView), sel_registerName("allocWithZone:"),
+                        (IMP)webViewAllocWithZone, "@@:^v");
+}
+
 @interface MacNCheeseWebBridge : NSObject
 + (void)tick:(id)timer;
 @end
 @implementation MacNCheeseWebBridge
 + (void)load {
-    if (!socketPath())
-        return;
-    // WKWebView objects become stand-ins that talk to the launcher.
-    Class webView = objc_getClass("WKWebView");
-    if (webView)
-        class_addMethod(object_getClass((id)webView), sel_registerName("allocWithZone:"),
-                        (IMP)webViewAllocWithZone, "@@:^v");
+    installWebViewHook();
     dispatch_async(&_dispatch_main_q, ^{
+        // Classes ride with their image; this retry covers an image
+        // registered after ours (class_addMethod adding once is a no-op).
+        installWebViewHook();
         initializeBridge();
         id timer = [NSTimer timerWithTimeInterval:0.02 target:self selector:@selector(tick:) userInfo:nil repeats:YES];
         [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
-        write(2, "[MacNCheese Web] Embedded pages open in the launcher's browser window\n", 68);
+        if (socketPath())
+            write(2, "[MacNCheese Web] Embedded pages open in the launcher's browser window\n", 68);
     });
 }
 + (void)tick:(id)timer {
@@ -690,8 +699,9 @@ static void failRequests(id view, NSString *reason) {
 - (id)initWithFrame:(NSRect)frame configuration:(id)configuration;
 - (void)macncheeseCloseHostedView;
 @end
-// Installed by +[MacNCheeseWebBridge load], only when the launcher listens:
-// without it Roblox keeps Darling's WKWebView.
+// Installed by +[MacNCheeseWebBridge load] unconditionally: without it
+// Roblox keeps Darling's stub WKWebView (and its garbage init) instead of
+// the stand-in, listening or not.
 static id webViewAllocWithZone(id cls, SEL selector, void *zone) {
     (void)cls; (void)selector; (void)zone;
     return (id)[MacNCheeseWebView alloc];
