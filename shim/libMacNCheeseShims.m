@@ -1995,13 +1995,16 @@ static void* macncheese_set_window_icon_thread(void* unused) {
     (void)unused;
     const char* path = getenv("MACNCHEESE_ICON_ARGB");
     MacNCheeseFILE* file = path ? fopen(path, "rb") : 0;
-    if (!file)
+    if (!file) {
+        write_str("[MacNCheese] Window icon: cannot open icon file\n");
         return 0;
+    }
     extern unsigned long fread(void*, unsigned long, unsigned long, MacNCheeseFILE*);
     unsigned int* words = (unsigned int*)malloc(1 << 22);
     unsigned long count = words ? fread(words, 4, (1 << 22) / 4, file) : 0;
     fclose(file);
     if (!count) {
+        write_str("[MacNCheese] Window icon: icon file empty\n");
         free(words);
         return 0;
     }
@@ -2026,6 +2029,8 @@ static void* macncheese_set_window_icon_thread(void* unused) {
         if (sync)
             sync(display, 0);
         write_str("[MacNCheese] Window icon set\n");
+    } else {
+        write_str("[MacNCheese] Window icon: X connection failed\n");
     }
     if (display && close_display)
         close_display(display);
@@ -2053,11 +2058,17 @@ static unsigned long macncheese_native_window_handle(id window) {
 static void macncheese_set_window_icon(id window) {
     if (macncheese_wayland_enabled())
         return;
-    if (!getenv("MACNCHEESE_ICON_ARGB") || macncheese_icon_window)
+    if (!getenv("MACNCHEESE_ICON_ARGB")) {
+        write_str("[MacNCheese] Window icon: MACNCHEESE_ICON_ARGB not set\n");
+        return;
+    }
+    if (macncheese_icon_window)
         return;
     macncheese_icon_window = macncheese_native_window_handle(window);
-    if (!macncheese_icon_window)
+    if (!macncheese_icon_window) {
+        write_str("[MacNCheese] Window icon: no X window handle\n");
         return;
+    }
     extern int pthread_create(void**, const void*, void* (*)(void*), void*);
     extern int pthread_detach(void*);
     void* thread;

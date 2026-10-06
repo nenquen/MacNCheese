@@ -350,7 +350,12 @@ fn shim_variables(settings: &serde_json::Map<String, serde_json::Value>) -> Resu
         vars.push(format!("MACNCHEESE_VRAM_BYTES={vram}"));
     }
     if let Some(icon) = crate::icon::icon_argb_file() {
-        vars.push(format!("MACNCHEESE_ICON_ARGB={}", icon.display()));
+        // The shim reads this file from inside Darling — guest paths need
+        // the SystemRoot escape, same as TMPDIR above.
+        vars.push(format!(
+            "MACNCHEESE_ICON_ARGB=/Volumes/SystemRoot{}",
+            icon.display()
+        ));
     }
     if bool_of("hide_menu_bar", true) {
         vars.push("MACNCHEESE_HIDE_MENU_BAR=1".into());
