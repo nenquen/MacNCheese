@@ -816,9 +816,29 @@ fn main() -> Result<()> {
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!("Mac'n Cheese {} — Roblox on Linux through Darling", env!("CARGO_PKG_VERSION"));
-        println!("Usage: macncheese [--version|--help|--tui] [roblox-url]");
+        println!("Usage: macncheese [--version|--help|--check|--tui] [roblox-url]");
         println!("Keys: number keys switch tabs · arrows/hjkl move · Enter activate · e edit flags · q quit.");
         println!("Mouse: click tabs, buttons and rows.");
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--check") {
+        // Environment self-diagnosis: what a launch would rely on.
+        println!("client        : {}", update::installed_version().unwrap_or_else(|| "NOT INSTALLED".into()));
+        println!("prebuilt env  : {:?}", std::env::var("MACNCHEESE_PREBUILT_SHIM"));
+        println!("shim dylib    : {}", paths::shim().display());
+        println!("  is_file     : {}", paths::shim().is_file());
+        println!("frameworks    : {}", paths::frameworks_build().display());
+        println!("shim_built    : {}", session::shim_built());
+        let missing = session::missing_tools();
+        println!(
+            "missing tools : {}",
+            if missing.is_empty() { "none".into() } else { missing.join(", ") }
+        );
+        println!("darling prefix: {}", paths::darling_prefix().display());
+        println!(
+            "  exists      : {}",
+            paths::darling_prefix().is_dir()
+        );
         return Ok(());
     }
     let force_tui = args.iter().any(|a| a == "--tui");
