@@ -56,7 +56,10 @@ impl Tab {
 enum Action {
     Tab(usize),
     PlayToggle,
+    /// Label half of a settings row: select it.
     SettingsRow(usize),
+    /// Value half of a settings row: select and cycle forward.
+    SettingsValue(usize),
     FlagRow(usize),
     LogRow(usize),
     SetupRun,
@@ -464,7 +467,8 @@ impl App {
     /// Mouse wheel: lists move, log tail scrolls (down = newer).
     fn wheel(&mut self, delta: i32) {
         match self.current() {
-            Tab::Settings | Tab::Flags => self.move_cursor(delta * 3),
+            Tab::Settings => self.move_cursor(delta),
+            Tab::Flags => self.move_cursor(delta * 3),
             Tab::Logs => self.scroll_tail(delta * 10),
             _ => {}
         }
@@ -533,14 +537,24 @@ impl App {
                 KeyAction::None
             }
             Key::PageUp => {
-                if self.current() == Tab::Logs {
-                    self.scroll_tail(-10);
+                match self.current() {
+                    Tab::Settings => self.jump_section(-1),
+                    Tab::Logs => self.scroll_tail(-10),
+                    _ => {}
                 }
                 KeyAction::None
             }
             Key::PageDown => {
-                if self.current() == Tab::Logs {
-                    self.scroll_tail(10);
+                match self.current() {
+                    Tab::Settings => self.jump_section(1),
+                    Tab::Logs => self.scroll_tail(10),
+                    _ => {}
+                }
+                KeyAction::None
+            }
+            Key::Backspace => {
+                if self.current() == Tab::Settings {
+                    self.reset_setting();
                 }
                 KeyAction::None
             }
@@ -570,7 +584,7 @@ impl App {
             Tab::Play => self.play_toggle(),
             Tab::Settings => {
                 if let Some(row) = setting_rows().get(self.settings_cursor) {
-                    row.left(&mut self.settings);
+                    row.right(&mut self.settings);
                     self.save_settings();
                 }
             }
@@ -737,6 +751,43 @@ impl App {
         }
     }
 
+    /// PgUp/PgDn: jump between settings sections.
+    fn jump_section(&mut self, dir: i32) {
+        let starts = section_starts();
+        if starts.is_empty() {
+            return;
+        }
+        let cur = self.settings_cursor as usize;
+        let current = starts.iter().rposition(|&s| s <= cur).unwrap_or(0);
+        if dir < 0 {
+            // PgUp: this section's start first, then the previous one.
+            self.settings_cursor = if cur > starts[current] {
+                starts[current]
+            } else if current > 0 {
+                starts[current - 1]
+            } else {
+                0
+            };
+        } else {
+            // PgDn: the next section's start, else the end of the list.
+            let next = current + 1;
+            self.settings_cursor = if next < starts.len() {
+                starts[next]
+            } else {
+                setting_rows().len().saturating_sub(1)
+            };
+        }
+    }
+
+    /// Backspace: restore the selected row's default.
+    fn reset_setting(&mut self) {
+        if let Some(row) = setting_rows().get(self.settings_cursor) {
+            row.reset(&mut self.settings);
+            self.save_settings();
+            self.status = format!("{} reset to default.", row.title());
+        }
+    }
+
     pub fn on_click(&mut self, column: u16, row: u16) -> KeyAction {
         let hit = self
             .clicks
@@ -757,8 +808,12 @@ impl App {
             }
             Some(Action::SettingsRow(i)) => {
                 self.settings_cursor = i;
+                KeyAction::None
+            }
+            Some(Action::SettingsValue(i)) => {
+                self.settings_cursor = i;
                 if let Some(r) = setting_rows().get(i) {
-                    r.left(&mut self.settings);
+                    r.right(&mut self.settings);
                     self.save_settings();
                 }
                 KeyAction::None
@@ -985,25 +1040,116 @@ fn render_play(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palett
     clickable_button(f, app, pal, Rect::new(btn.x, btn.y + 1, btn.width, 1), label, Action::PlayToggle);
 }
 
+/// Key + description pairs rendered as ` {key}{sep}{desc}  `.
+fn hint_line(pal: &crate::theme::Palette, parts: &[(&str, &str)], sep: &str) -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    for (key, desc) in parts {
+        spans.push(Span::styled(
+            format!(" {key}"),
+            Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::styled(
+            format!("{sep}{desc}  "),
+            Style::default().fg(pal.dim),
+        ));
+    }
+    Line::from(spans)
+}
+
 fn render_settings(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
-    let y0 = area.y + 1;
-    let items: Vec<ListItem> = setting_rows()
-        .iter()
-        .enumerate()
-        .map(|(i, row)| {
-            let style = if i == app.settings_cursor {
-                Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(4), Constraint::Length(5)])
+        .split(area);
+
+    // -- grouped rows: section headers, then two-column entries -------
+    let inner_w = chunks[0].width.saturating_sub(2) as usize;
+    let sel_style = Style::default()
+        .fg(pal.bg)
+        .bg(pal.accent)
+        .add_modifier(Modifier::BOLD);
+    let mut items: Vec<ListItem> = Vec::new();
+    let mut index = 0usize;
+    for section in setting_sections() {
+        items.push(ListItem::new(Line::from(Span::styled(
+            format!("\u{25b8} {}", section.title),
+            Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
+        ))));
+        for row in &section.rows {
+            let value = row.value_text(&app.settings);
+            let label = format!("  {}", row.title());
+            let pad = inner_w.saturating_sub(value.chars().count());
+            let line = if index == app.settings_cursor {
+                // One full-width span so the highlight band reaches the
+                // right edge of the row.
+                Line::from(Span::styled(
+                    format!("{label:<pad$}{value}"),
+                    sel_style,
+                ))
             } else {
-                Style::default()
+                let mut spans = vec![Span::styled(
+                    format!("{label:<pad$}"),
+                    Style::default().fg(pal.fg),
+                )];
+                spans.extend(row.value_spans(&app.settings, pal));
+                Line::from(spans)
             };
+            // Click zones: the label picks the row, the value column
+            // selects it and cycles forward.
+            let y = chunks[0].y + 1 + items.len() as u16;
+            let x = chunks[0].x + 1;
+            let total = inner_w as u16;
+            let value_zone = 36u16.min(total.saturating_sub(12));
             app.clicks.push((
-                Rect::new(area.x + 1, y0 + i as u16, area.width.saturating_sub(2), 1),
-                Action::SettingsRow(i),
+                Rect::new(x, y, total - value_zone, 1),
+                Action::SettingsRow(index),
             ));
-            ListItem::new(Line::from(Span::styled(row.describe(&app.settings), style)))
-        })
-        .collect();
-    f.render_widget(List::new(items).block(title_block(pal, "Settings")), area);
+            app.clicks.push((
+                Rect::new(x + total - value_zone, y, value_zone, 1),
+                Action::SettingsValue(index),
+            ));
+            items.push(ListItem::new(line));
+            index += 1;
+        }
+    }
+    f.render_widget(
+        List::new(items).block(title_block(pal, "Settings")),
+        chunks[0],
+    );
+
+    // -- help for the selected row, with the key hints at the bottom --
+    let row = setting_rows().into_iter().nth(app.settings_cursor);
+    let title = row.as_ref().map(Row::title).unwrap_or("Settings");
+    let help = row.as_ref().map(Row::help).unwrap_or_default().to_string();
+    let block = title_block(pal, &format!("Help \u{2014} {title}"));
+    let inner = block.inner(chunks[1]);
+    f.render_widget(
+        Paragraph::new(help)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .style(Style::default().fg(pal.dim))
+            .block(block),
+        chunks[1],
+    );
+    f.render_widget(
+        Paragraph::new(hint_line(
+            pal,
+            &[
+                ("\u{2191}\u{2193}", "select"),
+                ("\u{2190}\u{2192}", "change"),
+                ("Enter", "cycle"),
+                ("\u{232b}", "default"),
+                ("PgUp/PgDn", "section"),
+                ("q", "quit"),
+            ],
+            " ",
+        )),
+        Rect::new(
+            inner.x,
+            inner.y + inner.height.saturating_sub(1),
+            inner.width,
+            1,
+        ),
+    );
 }
 
 fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
@@ -1040,26 +1186,22 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
         chunks[0],
         &mut app.flags_state,
     );
-    let editor: Vec<Span> = match &app.flag_edit {
+    let editor: Line = match &app.flag_edit {
         Some(ed) => {
             let prompt = match ed.stage {
                 EditStage::Name => "Flag name".to_string(),
                 EditStage::Value => format!("Value for {}", ed.name),
             };
-            vec![
+            Line::from(vec![
                 Span::styled(prompt + ": ", Style::default().fg(pal.accent)),
                 Span::styled(format!("{}▌", ed.buf), Style::default().fg(pal.fg)),
-            ]
+            ])
         }
-        None => [( "a", "add"), ("Enter", "edit"), ("d", "delete")]
-            .into_iter()
-            .flat_map(|(key, desc)| {
-                [
-                    Span::styled(format!(" {key}"), Style::default().fg(pal.accent).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!(": {desc}  "), Style::default().fg(pal.dim)),
-                ]
-            })
-            .collect(),
+        None => hint_line(
+            pal,
+            &[("a", "add"), ("Enter", "edit"), ("d", "delete")],
+            ": ",
+        ),
     };
     let bar = chunks[1];
     // The whole hint bar is clickable: starts the add flow.
@@ -1069,10 +1211,7 @@ fn render_flags(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
             Action::AddFlag,
         ));
     }
-    f.render_widget(
-        Paragraph::new(Line::from(editor)).block(title_block(pal, "")),
-        bar,
-    );
+    f.render_widget(Paragraph::new(editor).block(title_block(pal, "")), bar);
 }
 
 fn render_logs(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palette, area: Rect) {
@@ -1167,65 +1306,249 @@ fn render_setup(f: &mut ratatui::Frame, app: &mut App, pal: &crate::theme::Palet
 
 // ---------------------------------------------------------------- settings rows
 
-pub(crate) fn setting_rows() -> Vec<Row> {
+pub(crate) struct Section {
+    pub title: &'static str,
+    pub rows: Vec<Row>,
+}
+
+/// The Settings tab's rows, grouped under section headers.
+pub(crate) fn setting_sections() -> Vec<Section> {
     vec![
-        Row::Cycle {
-            key: "renderer",
-            title: "Renderer",
-            options: vec![("opengl".into(), "OpenGL".into()), ("vulkan".into(), "Vulkan (Zink, experimental)".into())],
+        Section {
+            title: "Graphics",
+            rows: vec![
+                Row::Cycle {
+                    key: "renderer",
+                    title: "Renderer",
+                    help: "GPU API for Roblox. OpenGL is the stable default; Vulkan renders through Zink and glitches in places.",
+                    options: vec![("opengl".into(), "OpenGL".into()), ("vulkan".into(), "Vulkan (Zink, experimental)".into())],
+                },
+                Row::Cycle {
+                    key: "display_backend",
+                    title: "Window backend",
+                    help: "How Roblox windows are created. X11 works everywhere; native Wayland is experimental with mouse-lock quirks.",
+                    options: vec![("x11".into(), "X11 / Xwayland".into()), ("wayland".into(), "Native Wayland (experimental)".into())],
+                },
+                Row::Number {
+                    key: "dpi_scale",
+                    title: "Roblox UI scale",
+                    help: "Size of Roblox's own interface, auto-detected from your desktop. 100% = native. Applies on next launch.",
+                    min: 1.0, max: 4.0, step: 0.05, pct: true,
+                },
+                Row::Bool {
+                    key: "mangohud",
+                    title: "MangoHud overlay",
+                    help: "FPS and frame-time overlay on top of Roblox, shown when MangoHud is available.",
+                    default: false,
+                },
+            ],
         },
-        Row::Cycle {
-            key: "display_backend",
-            title: "Window backend",
-            options: vec![("x11".into(), "X11 / Xwayland".into()), ("wayland".into(), "Native Wayland (experimental)".into())],
+        Section {
+            title: "Input",
+            rows: vec![
+                Row::Number {
+                    key: "mouse_sensitivity",
+                    title: "Camera sensitivity",
+                    help: "Multiplier for in-game mouse camera speed: 0.1 slow \u{2026} 5.0 fast.",
+                    min: 0.1, max: 5.0, step: 0.05, pct: false,
+                },
+                Row::Number {
+                    key: "scroll_sensitivity",
+                    title: "Scroll sensitivity",
+                    help: "Multiplier for wheel scrolling in Roblox menus: 0.1 slow \u{2026} 5.0 fast.",
+                    min: 0.1, max: 5.0, step: 0.1, pct: false,
+                },
+                Row::Bool {
+                    key: "raw_mouse",
+                    title: "Raw mouse input",
+                    help: "Pass raw, unaccelerated motion straight to Roblox. Keep this on unless the mouse feels wrong.",
+                    default: true,
+                },
+            ],
         },
-        Row::Number { key: "dpi_scale", title: "Roblox UI scale", min: 1.0, max: 4.0, step: 0.05, pct: true },
-        Row::Number { key: "mouse_sensitivity", title: "Camera sensitivity", min: 0.1, max: 5.0, step: 0.05, pct: false },
-        Row::Bool { key: "raw_mouse", title: "Raw mouse input", default: true },
-        Row::Bool { key: "hide_menu_bar", title: "Hide the macOS menu bar", default: true },
-        Row::Bool { key: "mangohud", title: "MangoHud overlay", default: false },
-        Row::Number { key: "tui_font_scale", title: "TUI font scale", min: 0.8, max: 2.0, step: 0.1, pct: false },
-        Row::Cycle {
-            key: "theme",
-            title: "Color theme",
-            options: crate::theme::names()
-                .into_iter()
-                .map(|(a, b)| (a.to_string(), b.to_string()))
-                .collect(),
+        Section {
+            title: "Interface",
+            rows: vec![
+                Row::Bool {
+                    key: "hide_menu_bar",
+                    title: "Hide the macOS menu bar",
+                    help: "Hide the fake macOS menu bar Roblox draws along the top of its window.",
+                    default: true,
+                },
+                Row::Number {
+                    key: "tui_font_scale",
+                    title: "TUI font scale",
+                    help: "Size of this launcher's own text, 80% \u{2026} 200%. Applies instantly.",
+                    min: 0.8, max: 2.0, step: 0.1, pct: true,
+                },
+                Row::Cycle {
+                    key: "theme",
+                    title: "Color theme",
+                    help: "Launcher palette, dark only \u{2014} System keeps the default dark look. Drop files in ~/.config/macncheese/themes for custom ones.",
+                    options: crate::theme::names()
+                        .into_iter()
+                        .map(|(a, b)| (a.to_string(), b.to_string()))
+                        .collect(),
+                },
+            ],
         },
     ]
 }
 
+/// Every selectable row, flattened in render order (cursor index space).
+pub(crate) fn setting_rows() -> Vec<Row> {
+    setting_sections()
+        .into_iter()
+        .flat_map(|s| s.rows)
+        .collect()
+}
+
+/// First flattened index of each section (PgUp/PgDn targets).
+fn section_starts() -> Vec<usize> {
+    let mut starts = Vec::new();
+    let mut n = 0;
+    for section in setting_sections() {
+        starts.push(n);
+        n += section.rows.len();
+    }
+    starts
+}
+
 pub(crate) enum Row {
-    Cycle { key: &'static str, title: &'static str, options: Vec<(String, String)> },
-    Number { key: &'static str, title: &'static str, min: f64, max: f64, step: f64, pct: bool },
-    Bool { key: &'static str, title: &'static str, default: bool },
+    Cycle {
+        key: &'static str,
+        title: &'static str,
+        help: &'static str,
+        options: Vec<(String, String)>,
+    },
+    Number {
+        key: &'static str,
+        title: &'static str,
+        help: &'static str,
+        min: f64,
+        max: f64,
+        step: f64,
+        pct: bool,
+    },
+    Bool {
+        key: &'static str,
+        title: &'static str,
+        help: &'static str,
+        default: bool,
+    },
+}
+
+/// Filled/empty cells showing where the value sits between min and max.
+fn range_bar(v: f64, min: f64, max: f64, width: usize) -> (usize, String, String) {
+    let span = (max - min).max(f64::EPSILON);
+    let filled = (((v - min) / span) * width as f64)
+        .round()
+        .clamp(0.0, width as f64) as usize;
+    (
+        filled,
+        "\u{2588}".repeat(filled),
+        "\u{2591}".repeat(width - filled),
+    )
 }
 
 impl Row {
-    fn describe(&self, settings: &Map<String, Value>) -> String {
+    fn key(&self) -> &'static str {
         match self {
-            Row::Cycle { title, options, key } => {
+            Row::Cycle { key, .. } | Row::Number { key, .. } | Row::Bool { key, .. } => key,
+        }
+    }
+
+    fn title(&self) -> &'static str {
+        match self {
+            Row::Cycle { title, .. } | Row::Number { title, .. } | Row::Bool { title, .. } => title,
+        }
+    }
+
+    pub(crate) fn help(&self) -> &'static str {
+        match self {
+            Row::Cycle { help, .. } | Row::Number { help, .. } | Row::Bool { help, .. } => help,
+        }
+    }
+
+    /// The value column as plain text (the selected row paints it in one
+    /// style, so it needs the same width as the styled spans).
+    fn value_text(&self, settings: &Map<String, Value>) -> String {
+        match self {
+            Row::Cycle { key, options, .. } => {
                 let cur = settings.get(*key).and_then(|v| v.as_str()).unwrap_or("");
                 let label = options
                     .iter()
                     .find(|(v, _)| v.as_str() == cur)
                     .map(|(_, l)| l.clone())
                     .unwrap_or_else(|| cur.to_string());
-                format!("{title}: {label}")
+                format!("\u{2039} {label} \u{203a}")
             }
-            Row::Number { title, key, pct, .. } => {
-                let v = settings.get(*key).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                if *pct {
-                    format!("{title}: {:.0}%", v * 100.0)
+            Row::Number { key, min, max, pct, .. } => {
+                let v = settings.get(*key).and_then(|v| v.as_f64()).unwrap_or(*min);
+                let (_, on, off) = range_bar(v, *min, *max, 10);
+                format!("{} {on}{off}", Row::display(v, *pct))
+            }
+            Row::Bool { key, default, .. } => {
+                let on = settings.get(*key).and_then(|v| v.as_bool()).unwrap_or(*default);
+                if on {
+                    "\u{25cf} on".to_string()
                 } else {
-                    format!("{title}: {v:.2}")
+                    "\u{25cb} off".to_string()
                 }
             }
-            Row::Bool { title, key, default } => {
-                let v = settings.get(*key).and_then(|v| v.as_bool()).unwrap_or(*default);
-                format!("{title}: {}", if v { "on" } else { "off" })
+        }
+    }
+
+    fn display(v: f64, pct: bool) -> String {
+        if pct {
+            format!("{}%", (v * 100.0).round() as i64)
+        } else {
+            format!("{v:.2}")
+        }
+    }
+
+    /// The value column split into styled parts: label in the accent color,
+    /// the bar's empty half dimmed so the fill reads at a glance.
+    pub(crate) fn value_spans(
+        &self,
+        settings: &Map<String, Value>,
+        pal: &crate::theme::Palette,
+    ) -> Vec<Span<'static>> {
+        match self {
+            Row::Number { key, min, max, pct, .. } => {
+                let v = settings.get(*key).and_then(|v| v.as_f64()).unwrap_or(*min);
+                let (_, on, off) = range_bar(v, *min, *max, 10);
+                vec![
+                    Span::styled(
+                        format!("{} ", Row::display(v, *pct)),
+                        Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(on, Style::default().fg(pal.accent)),
+                    Span::styled(off, Style::default().fg(pal.dim)),
+                ]
             }
+            Row::Bool { key, default, .. } => {
+                let on = settings.get(*key).and_then(|v| v.as_bool()).unwrap_or(*default);
+                if on {
+                    vec![Span::styled(
+                        "\u{25cf} on",
+                        Style::default().fg(pal.ok),
+                    )]
+                } else {
+                    vec![Span::styled("\u{25cb} off", Style::default().fg(pal.dim))]
+                }
+            }
+            Row::Cycle { .. } => vec![Span::styled(
+                self.value_text(settings),
+                Style::default().fg(pal.accent).add_modifier(Modifier::BOLD),
+            )],
+        }
+    }
+
+    /// Backspace: put the key back to its shipped default.
+    pub(crate) fn reset(&self, settings: &mut Map<String, Value>) {
+        if let Some(default) = crate::settings::default_for(self.key()) {
+            settings.insert(self.key().to_string(), default);
         }
     }
 
@@ -1303,6 +1626,76 @@ mod tui_tests {
         setting_rows()[1].right(&mut settings);
         let dpi = settings["dpi_scale"].as_f64().unwrap();
         assert!((1.0..=4.0).contains(&dpi), "dpi out of range: {dpi}");
+    }
+
+    #[test]
+    fn settings_tab_groups_and_explains() {
+        let mut app = App::new();
+        app.tab = app.tabs.iter().position(|t| *t == Tab::Settings).unwrap();
+        let text = drawn(&mut app);
+        for expected in [
+            "Graphics", "Input", "Interface", // section headers
+            "Help", "Renderer", // selected-row help block
+            "select", "default", // key hints
+        ] {
+            assert!(text.contains(expected), "settings view missing {expected:?}");
+        }
+        // Two click zones per row: label (select) + value (cycle).
+        let settings_clicks = app
+            .clicks
+            .iter()
+            .filter(|(_, a)| matches!(a, Action::SettingsRow(_) | Action::SettingsValue(_)))
+            .count();
+        assert_eq!(settings_clicks, setting_rows().len() * 2, "click zones");
+    }
+
+    #[test]
+    fn setting_rows_reset_to_defaults() {
+        let mut settings = settings::load();
+        settings.insert("renderer".into(), Value::from("vulkan"));
+        settings.insert("mangohud".into(), Value::Bool(true));
+        let rows = setting_rows();
+        let row = rows.iter().find(|r| r.key() == "renderer").expect("renderer row");
+        row.reset(&mut settings);
+        assert_eq!(settings["renderer"], Value::from("opengl"));
+        let mangohud = rows.iter().find(|r| r.key() == "mangohud").expect("mangohud row");
+        mangohud.reset(&mut settings);
+        assert_eq!(settings["mangohud"], Value::Bool(false));
+    }
+
+    #[test]
+    fn settings_selection_paints_an_accent_band() {
+        let mut app = App::new();
+        app.tab = app.tabs.iter().position(|t| *t == Tab::Settings).unwrap();
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| ui(f, &mut app)).unwrap();
+        let buf = terminal.backend().buffer();
+        let mode = app.settings.get("theme").and_then(|v| v.as_str()).unwrap_or("system");
+        let pal = crate::theme::resolve(mode);
+        // Block starts at y=3: header at y=4, selected first row at y=5.
+        let selected = &buf[(2, 5)];
+        assert_eq!(selected.bg, pal.accent, "selected row must be an accent band");
+        assert_eq!(selected.fg, pal.bg, "band text takes the background color");
+        let plain = &buf[(2, 6)];
+        assert_eq!(plain.bg, pal.bg, "unselected rows stay on the theme bg");
+    }
+
+    #[test]
+    fn page_keys_jump_between_sections() {
+        let mut app = App::new();
+        let starts = section_starts();
+        assert_eq!(starts.len(), 3, "expected Graphics/Input/Interface");
+        app.settings_cursor = starts[1] + 1;
+        app.jump_section(-1);
+        assert_eq!(app.settings_cursor, starts[1], "PgUp -> own section start");
+        app.jump_section(-1);
+        assert_eq!(app.settings_cursor, starts[0], "PgUp -> previous section");
+        app.jump_section(1);
+        assert_eq!(app.settings_cursor, starts[1], "PgDn -> next section");
+        app.settings_cursor = setting_rows().len() - 1;
+        app.jump_section(1);
+        assert_eq!(app.settings_cursor, setting_rows().len() - 1, "PgDn at end stays");
     }
 
     #[test]

@@ -74,6 +74,11 @@ pub fn load() -> Map<String, Value> {
     merged
 }
 
+/// The shipped default for one key (Backspace reset in the Settings tab).
+pub fn default_for(key: &str) -> Option<Value> {
+    defaults().get(key).cloned()
+}
+
 /// Atomic write (temp + rename), like the Python launcher.
 pub fn save(settings: &Map<String, Value>) -> Result<()> {
     let path = settings_file();
@@ -103,5 +108,7 @@ mod tests {
         let d = defaults();
         assert_eq!(d["hide_menu_bar"], Value::Bool(true));
         assert_eq!(d["renderer"], Value::from("opengl"));
+        assert_eq!(default_for("renderer"), Some(Value::from("opengl")));
+        assert_eq!(default_for("no_such_key"), None);
     }
 }
